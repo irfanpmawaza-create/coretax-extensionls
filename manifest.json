@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "CoreTax PDF Downloader & Ekspor Excel",
+  "version": "1.0.2",
+  "version_name": "1.0.2 Full",
+  "description": "Membantu mengunduh dokumen PDF CoreTax dan mengekspor hasil ekstrak data ke Excel.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://coretaxdjp.pajak.go.id/*"
+  ],
+
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://coretaxdjp.pajak.go.id/e-invoice-portal/*",
+        "https://coretaxdjp.pajak.go.id/withholding-slips-portal/*"
+      ],
+      "js": [
+        "libs/pdf.min.js",
+        "libs/xlsx.full.min.js",
+        "pdf-extractor.js",
+        "excel-exporter.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+
+    "default_popup": "popup.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "kapls.png",
+        "styles.css",
+        "libs/pdf.min.js",
+        "libs/pdf.worker.min.js",
+        "libs/xlsx.full.min.js"
+      ],
+      "matches": [
+        "https://coretaxdjp.pajak.go.id/*"
+      ]
+    }
+  ]
+}

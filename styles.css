@@ -1,0 +1,155 @@
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  width: 260px;
+  padding: 12px;
+  text-align: center;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 10px 0 10px 0;
+}
+
+.popup-logo {
+  width: 150px;
+  height: auto;
+  display: block;
+  margin: 0 auto 8px auto;
+}
+
+.popup-logo-link {
+  text-decoration: none;
+}
+
+/* Container tombol, kalau popup.html sudah memakai pembungkus */
+.popup-button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+
+.popup-download-btn {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  background-color: #d00000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  box-sizing: border-box;
+
+  /* Tetap kasih jarak walaupun tombol tidak dibungkus popup-button-group */
+  display: block;
+  margin: 0 0 18px 0;
+}
+
+/* Jarak bawah tombol terakhir ke catatan */
+.popup-download-btn:last-of-type {
+  margin-bottom: 24px;
+}
+
+.popup-download-btn:hover {
+  background-color: #b00000;
+}
+
+#excel-only-btn {
+  background-color: #349e48;
+}
+
+#excel-only-btn:hover {
+  background-color: #2a7d3a;
+}
+
+.popup-download-btn:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.popup-note {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+  margin: 0 0 10px 0;
+}
+
+.popup-disclaimer {
+  margin-top: 10px;
+  padding: 10px 10px;
+  background-color: #f7f7f7;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  text-align: left;
+  color: #444;
+}
+
+.popup-disclaimer-title {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.popup-disclaimer ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.popup-disclaimer li {
+  font-size: 11px;
+  line-height: 1.35;
+  margin-bottom: 5px;
+}
+
+.popup-disclaimer li:last-child {
+  margin-bottom: 0;
+}
+
+.popup-status {
+  display: none;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #333;
+  margin: 0 0 14px 0;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.popup-status.is-error {
+  display: block;
+  color: #8f0000;
+  background-color: #fff0f0;
+  border: 1px solid #d00000;
+}
+
+.popup-status.is-ready {
+  display: block;
+  color: #176c2f;
+  background-color: #eef9f1;
+  border: 1px solid #71b983;
+}
+
+.popup-footer {
+  margin-top: 14px;
+}
+
+.popup-divider {
+  width: 100%;
+  height: 1px;
+  background-color: #bdbdbd;
+  margin: 12px 0 10px 0;
+}
+
+.popup-version {
+  font-size: 9px;
+  color: #777;
+  margin: 0;
+  text-align: left;
+}
