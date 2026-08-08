@@ -34,6 +34,13 @@
         overflow: "hidden"
       });
 
+      const savedPosition = this.loadToolbarPosition();
+      if (savedPosition) {
+        toolbar.style.top = `${savedPosition.top}px`;
+        toolbar.style.left = `${savedPosition.left}px`;
+        toolbar.style.right = "auto";
+      }
+
       const header = document.createElement("div");
       Object.assign(header.style, {
         display: "flex",
@@ -44,10 +51,11 @@
         color: "#ffffff",
         fontSize: "13px",
         fontWeight: "600",
-        cursor: "pointer",
+        cursor: "move",
         userSelect: "none"
       });
       header.textContent = "CoreTax Extension";
+      this.makeToolbarDraggable(toolbar, header);
 
       const toggleIcon = document.createElement("span");
       toggleIcon.textContent = "▾";
@@ -97,6 +105,7 @@
 
       let collapsed = false;
       header.addEventListener("click", () => {
+        if (toolbar.dataset.dragged === "true") return;
         collapsed = !collapsed;
         body.style.display = collapsed ? "none" : "flex";
         toggleIcon.textContent = collapsed ? "▸" : "▾";
@@ -105,6 +114,62 @@
       toolbar.appendChild(header);
       toolbar.appendChild(body);
       document.body.appendChild(toolbar);
+    }
+
+    makeToolbarDraggable(toolbar, handle) {
+      let startX = 0;
+      let startY = 0;
+      let startTop = 0;
+      let startLeft = 0;
+
+      const onMouseMove = (event) => {
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) toolbar.dataset.dragged = "true";
+
+        const maxLeft = window.innerWidth - toolbar.offsetWidth;
+        const maxTop = window.innerHeight - toolbar.offsetHeight;
+        toolbar.style.left = `${Math.min(Math.max(startLeft + dx, 0), maxLeft)}px`;
+        toolbar.style.top = `${Math.min(Math.max(startTop + dy, 0), maxTop)}px`;
+        toolbar.style.right = "auto";
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        if (toolbar.dataset.dragged === "true") {
+          this.saveToolbarPosition(toolbar.offsetTop, toolbar.offsetLeft);
+        }
+        setTimeout(() => { toolbar.dataset.dragged = "false"; }, 0);
+      };
+
+      handle.addEventListener("mousedown", (event) => {
+        startX = event.clientX;
+        startY = event.clientY;
+        startTop = toolbar.offsetTop;
+        startLeft = toolbar.offsetLeft;
+        toolbar.dataset.dragged = "false";
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+        event.preventDefault();
+      });
+    }
+
+    saveToolbarPosition(top, left) {
+      try {
+        localStorage.setItem("coretaxToolbarPosition", JSON.stringify({ top, left }));
+      } catch (_) {
+        // localStorage tidak tersedia, abaikan.
+      }
+    }
+
+    loadToolbarPosition() {
+      try {
+        const raw = localStorage.getItem("coretaxToolbarPosition");
+        return raw ? JSON.parse(raw) : null;
+      } catch (_) {
+        return null;
+      }
     }
 
     async handleToolbarClick(button, mode, originalLabel) {
