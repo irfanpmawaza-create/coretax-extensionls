@@ -13,7 +13,7 @@
       this.excelExporter = new window.CoreTaxExcelExporter();
       this.initializeMessageListener();
       if (this.isCompatiblePage()) this.injectToolbar();
-      console.log("CoreTax PDF Downloader & Excel Extractor v1.0.2 Full aktif.");
+      console.log("CoreTax PDF Downloader & Excel Extractor v1.1.0 Multi Periode aktif.");
     }
 
     injectToolbar() {
@@ -102,6 +102,7 @@
       body.appendChild(excelBtn);
       body.appendChild(pdfBtn);
       body.appendChild(bothBtn);
+      body.appendChild(this.buildMultiPeriodSection());
 
       let collapsed = false;
       header.addEventListener("click", () => {
@@ -172,6 +173,145 @@
       }
     }
 
+    buildMultiPeriodSection() {
+      const section = document.createElement("div");
+      Object.assign(section.style, {
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px",
+        borderTop: "1px solid #ddd",
+        paddingTop: "8px"
+      });
+
+      const isWithholdingPage = window.location.pathname.includes("/withholding-slips-portal/");
+
+      const toggleBtn = document.createElement("button");
+      toggleBtn.textContent = isWithholdingPage ? "Bukti Potong Multi Periode" : "Faktur Keluaran Multi Periode";
+      Object.assign(toggleBtn.style, {
+        width: "100%",
+        padding: "10px 12px",
+        fontSize: "13px",
+        fontWeight: "bold",
+        cursor: "pointer",
+        backgroundColor: "#1a73e8",
+        color: "#ffffff",
+        border: "0",
+        borderRadius: "6px",
+        boxSizing: "border-box"
+      });
+      toggleBtn.addEventListener("mouseenter", () => { toggleBtn.style.backgroundColor = "#1558b0"; });
+      toggleBtn.addEventListener("mouseleave", () => { toggleBtn.style.backgroundColor = "#1a73e8"; });
+
+      const panel = document.createElement("div");
+      Object.assign(panel.style, { display: "none", flexDirection: "column", gap: "6px" });
+
+      const fieldStyle = {
+        width: "100%",
+        padding: "6px 8px",
+        fontSize: "12px",
+        boxSizing: "border-box",
+        border: "1px solid #ccc",
+        borderRadius: "4px"
+      };
+      const labelStyle = { fontSize: "11px", color: "#333" };
+
+      const yearLabel = document.createElement("label");
+      yearLabel.textContent = "Tahun";
+      Object.assign(yearLabel.style, labelStyle);
+      const yearInput = document.createElement("input");
+      yearInput.type = "number";
+      yearInput.min = "2020";
+      yearInput.max = "2100";
+      yearInput.value = String(new Date().getFullYear());
+      Object.assign(yearInput.style, fieldStyle);
+
+      const makeMonthSelect = (defaultMonth) => {
+        const select = document.createElement("select");
+        Object.assign(select.style, fieldStyle);
+        for (let month = 1; month <= 12; month++) {
+          const option = document.createElement("option");
+          option.value = String(month);
+          option.textContent = this.getMonthName(month);
+          select.appendChild(option);
+        }
+        select.value = String(defaultMonth);
+        return select;
+      };
+
+      const startLabel = document.createElement("label");
+      startLabel.textContent = "Dari Bulan";
+      Object.assign(startLabel.style, labelStyle);
+      const startMonthSelect = makeMonthSelect(1);
+
+      const endLabel = document.createElement("label");
+      endLabel.textContent = "Sampai Bulan";
+      Object.assign(endLabel.style, labelStyle);
+      const endMonthSelect = makeMonthSelect(2);
+
+      const processBtn = document.createElement("button");
+      processBtn.textContent = "Proses Multi Periode";
+      Object.assign(processBtn.style, {
+        width: "100%",
+        padding: "10px 12px",
+        fontSize: "13px",
+        fontWeight: "bold",
+        cursor: "pointer",
+        backgroundColor: "#349e48",
+        color: "#ffffff",
+        border: "0",
+        borderRadius: "6px",
+        boxSizing: "border-box",
+        marginTop: "4px"
+      });
+      processBtn.addEventListener("mouseenter", () => {
+        if (!processBtn.disabled) processBtn.style.backgroundColor = "#2a7d3a";
+      });
+      processBtn.addEventListener("mouseleave", () => {
+        if (!processBtn.disabled) processBtn.style.backgroundColor = "#349e48";
+      });
+      processBtn.addEventListener("click", () => {
+        this.handleMultiPeriodToolbarClick(processBtn, yearInput, startMonthSelect, endMonthSelect);
+      });
+
+      toggleBtn.addEventListener("click", () => {
+        panel.style.display = panel.style.display === "none" ? "flex" : "none";
+      });
+
+      panel.appendChild(yearLabel);
+      panel.appendChild(yearInput);
+      panel.appendChild(startLabel);
+      panel.appendChild(startMonthSelect);
+      panel.appendChild(endLabel);
+      panel.appendChild(endMonthSelect);
+      panel.appendChild(processBtn);
+
+      section.appendChild(toggleBtn);
+      section.appendChild(panel);
+      return section;
+    }
+
+    async handleMultiPeriodToolbarClick(button, yearInput, startMonthSelect, endMonthSelect) {
+      button.disabled = true;
+      button.style.cursor = "not-allowed";
+      const originalLabel = button.textContent;
+      button.textContent = "Memproses...";
+
+      try {
+        await this.downloadMultiPeriodInvoices({
+          year: Number(yearInput.value),
+          startMonth: Number(startMonthSelect.value),
+          endMonth: Number(endMonthSelect.value)
+        });
+      } catch (error) {
+        console.error("KESALAHAN MULTI PERIODE:", error);
+        alert(`Gagal: ${error.message || error}`);
+      } finally {
+        button.disabled = false;
+        button.style.cursor = "pointer";
+        button.textContent = originalLabel;
+      }
+    }
+
     async handleToolbarClick(button, mode, originalLabel) {
       this.toolbarButtons.forEach((btn) => {
         btn.disabled = true;
@@ -210,7 +350,311 @@
             });
           return true;
         }
+
+        if (request.action === "downloadMultiPeriodInvoices") {
+          this.downloadMultiPeriodInvoices(request)
+            .then((result) => sendResponse(result))
+            .catch((error) => {
+              console.error("KESALAHAN MULTI PERIODE:", error);
+              sendResponse({
+                success: false,
+                message: error.message || "Terjadi kesalahan saat mengambil Faktur Keluaran multi periode."
+              });
+            });
+          return true;
+        }
       });
+    }
+
+    getPeriodCode(month) {
+      return `TD.007${String(month).padStart(2, "0")}`;
+    }
+
+    getMonthName(month) {
+      const months = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      ];
+      return months[month - 1] || String(month);
+    }
+
+    sendMessageToBackground(message) {
+      return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(response);
+        });
+      });
+    }
+
+    async fetchOutputInvoicePage({ periodCode, year, first, rows }) {
+      const result = await this.sendMessageToBackground({
+        action: "fetchOutputInvoicesPage",
+        periodCode,
+        year,
+        first,
+        rows
+      });
+
+      if (!result?.success) {
+        throw new Error(result?.message || "Gagal mengambil data Faktur Keluaran.");
+      }
+
+      const apiResponse = result.response;
+      if (!apiResponse?.IsSuccessful) {
+        throw new Error(apiResponse?.Message || "CoreTax mengembalikan status gagal.");
+      }
+
+      return apiResponse.Payload || { TotalRecords: 0, Data: [] };
+    }
+
+    async fetchAllOutputInvoicesForMonth(month, year) {
+      const periodCode = this.getPeriodCode(month);
+      const rows = 50;
+      let first = 0;
+      let totalRecords = null;
+      const collected = [];
+      const seen = new Set();
+      let safety = 0;
+
+      while (safety < 500) {
+        safety++;
+        const payload = await this.fetchOutputInvoicePage({
+          periodCode,
+          year,
+          first,
+          rows
+        });
+
+        const data = Array.isArray(payload.Data) ? payload.Data : [];
+        if (totalRecords === null && Number.isFinite(Number(payload.TotalRecords))) {
+          totalRecords = Number(payload.TotalRecords);
+        }
+
+        for (const item of data) {
+          const key = item.RecordId || item.AggregateIdentifier || `${item.TaxInvoiceNumber || ""}-${item.TaxInvoiceDate || ""}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            collected.push(item);
+          }
+        }
+
+        if (data.length === 0) break;
+        if (data.length < rows) break;
+        if (totalRecords !== null && first + data.length >= totalRecords) break;
+
+        first += rows;
+      }
+
+      return collected;
+    }
+
+    formatApiDate(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      const dd = String(date.getDate()).padStart(2, "0");
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const yyyy = date.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    mapOutputInvoiceToExcelRow(item) {
+      const periodMonth = Number(String(item.TaxInvoicePeriod || "").slice(-2));
+      return {
+        "Masa Pajak": this.getMonthName(periodMonth),
+        "Tahun": item.TaxInvoiceYear || "",
+        "Tanggal Faktur Pajak": this.formatApiDate(item.TaxInvoiceDate),
+        "Nomor Faktur Pajak": item.TaxInvoiceNumber || "",
+        "Kode Faktur": item.TaxInvoiceCode || "",
+        "NPWP Penjual": item.SellerTIN || "",
+        "Nama Penjual": item.SellerTaxpayerName || "",
+        "NPWP Pembeli": item.BuyerTIN || "",
+        "Nama Pembeli": item.BuyerTaxpayerNameClear || item.BuyerName || item.DisplayName || item.BuyerTaxpayerName || "",
+        "DPP": item.SellingPrice ?? 0,
+        "DPP Nilai Lain": item.OtherTaxBase ?? 0,
+        "PPN": item.VAT ?? 0,
+        "PPnBM": item.STLG ?? 0,
+        "Status Faktur": item.TaxInvoiceStatus || "",
+        "Status Pembeli": item.BuyerStatus || "",
+        "Referensi": item.Reference || "",
+        "Penandatangan": item.Signer || "",
+        "Metode Input": item.InputMethod || "",
+        "Tanggal Dibuat": this.formatApiDate(item.CreationDate),
+        "Tanggal Update": this.formatApiDate(item.LastUpdatedDate)
+      };
+    }
+
+    async downloadMultiPeriodInvoices(options = {}) {
+      if (!this.isCompatiblePage()) {
+        throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
+      }
+
+      if (window.location.pathname.includes("/withholding-slips-portal/")) {
+        return this.downloadMultiPeriodWithholdingSlips(options);
+      }
+
+      if (!window.location.pathname.includes("/e-invoice-portal/")) {
+        throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
+      }
+
+      const year = Number(options.year);
+      const startMonth = Number(options.startMonth);
+      const endMonth = Number(options.endMonth);
+
+      if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+        throw new Error("Tahun tidak valid.");
+      }
+      if (!Number.isInteger(startMonth) || !Number.isInteger(endMonth) || startMonth < 1 || endMonth > 12 || startMonth > endMonth) {
+        throw new Error("Rentang bulan tidak valid.");
+      }
+
+      const allInvoices = [];
+      for (let month = startMonth; month <= endMonth; month++) {
+        console.log(`MULTI PERIODE: mengambil ${this.getMonthName(month)} ${year}...`);
+        const monthData = await this.fetchAllOutputInvoicesForMonth(month, year);
+        allInvoices.push(...monthData);
+        console.log(`MULTI PERIODE: ${this.getMonthName(month)} = ${monthData.length} faktur.`);
+      }
+
+      if (allInvoices.length === 0) {
+        throw new Error("Tidak ada Faktur Keluaran yang ditemukan untuk periode tersebut.");
+      }
+
+      const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
+      const startLabel = this.getMonthName(startMonth).slice(0, 3);
+      const endLabel = this.getMonthName(endMonth).slice(0, 3);
+      const fileName = startMonth === endMonth
+        ? `Faktur_Keluaran_${year}_${startLabel}.xlsx`
+        : `Faktur_Keluaran_${year}_${startLabel}-${endLabel}.xlsx`;
+
+      this.excelExporter.export(excelRows, fileName);
+
+      const message = `Selesai. ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
+      this.showFinalNotification(message, []);
+      return { success: true, message, count: allInvoices.length, fileName };
+    }
+
+    getWithholdingPeriodCode(month, year) {
+      const mm = String(month).padStart(2, "0");
+      return `${mm}${mm}${year}`;
+    }
+
+    async fetchWithholdingSlipPage({ periodCode, first, rows }) {
+      const result = await this.sendMessageToBackground({
+        action: "fetchWithholdingSlipsPage",
+        periodCode,
+        first,
+        rows
+      });
+
+      if (!result?.success) {
+        throw new Error(result?.message || "Gagal mengambil data Bukti Potong.");
+      }
+
+      const apiResponse = result.response;
+      if (!apiResponse?.IsSuccessful) {
+        throw new Error(apiResponse?.Message || "CoreTax mengembalikan status gagal.");
+      }
+
+      return apiResponse.Payload || { TotalRecords: 0, Data: [] };
+    }
+
+    async fetchAllWithholdingSlipsForMonth(month, year) {
+      const periodCode = this.getWithholdingPeriodCode(month, year);
+      const rows = 50;
+      let first = 0;
+      let totalRecords = null;
+      const collected = [];
+      const seen = new Set();
+      let safety = 0;
+
+      while (safety < 500) {
+        safety++;
+        const payload = await this.fetchWithholdingSlipPage({ periodCode, first, rows });
+
+        const data = Array.isArray(payload.Data) ? payload.Data : [];
+        if (totalRecords === null && Number.isFinite(Number(payload.TotalRecords))) {
+          totalRecords = Number(payload.TotalRecords);
+        }
+
+        for (const item of data) {
+          const key = item.RecordId || item.WithholdingslipsAggregateIdentifier;
+          if (!seen.has(key)) {
+            seen.add(key);
+            collected.push(item);
+          }
+        }
+
+        if (data.length === 0) break;
+        if (data.length < rows) break;
+        if (totalRecords !== null && first + data.length >= totalRecords) break;
+
+        first += rows;
+      }
+
+      return collected;
+    }
+
+    mapWithholdingSlipToExcelRow(item) {
+      const periodMonth = Number(String(item.TaxPeriodCode || "").slice(0, 2));
+      return {
+        "Masa Pajak": this.getMonthName(periodMonth),
+        "Tahun": String(item.TaxPeriodCode || "").slice(-4),
+        "Nomor Bukti Potong": item.WithholdingSlipsNumber || "",
+        "Tanggal Bukti Potong": this.formatApiDate(item.WithholdingSlipsDate),
+        "NPWP/NIK Dipotong": item.TaxIdentificationNumber || "",
+        "Nama Dipotong": item.Name || "",
+        "Kode Objek Pajak": item.TaxObjectCode || "",
+        "Pasal": item.TaxArticle || "",
+        "Penghasilan Bruto": item.GrossIncome ?? 0,
+        "Dasar Pengenaan Pajak": item.TaxBase ?? 0,
+        "Tarif": item.TaxRate ?? 0,
+        "PPh Dipotong": item.IncomeTaxWithheld ?? 0,
+        "Status": item.WithholdingSlipsStatus || "",
+        "Tanggal Dibuat": this.formatApiDate(item.CreationDate)
+      };
+    }
+
+    async downloadMultiPeriodWithholdingSlips(options = {}) {
+      const year = Number(options.year);
+      const startMonth = Number(options.startMonth);
+      const endMonth = Number(options.endMonth);
+
+      if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+        throw new Error("Tahun tidak valid.");
+      }
+      if (!Number.isInteger(startMonth) || !Number.isInteger(endMonth) || startMonth < 1 || endMonth > 12 || startMonth > endMonth) {
+        throw new Error("Rentang bulan tidak valid.");
+      }
+
+      const allSlips = [];
+      for (let month = startMonth; month <= endMonth; month++) {
+        console.log(`MULTI PERIODE BUPOT: mengambil ${this.getMonthName(month)} ${year}...`);
+        const monthData = await this.fetchAllWithholdingSlipsForMonth(month, year);
+        allSlips.push(...monthData);
+        console.log(`MULTI PERIODE BUPOT: ${this.getMonthName(month)} = ${monthData.length} bukti potong.`);
+      }
+
+      if (allSlips.length === 0) {
+        throw new Error("Tidak ada Bukti Potong yang ditemukan untuk periode tersebut.");
+      }
+
+      const excelRows = allSlips.map((item) => this.mapWithholdingSlipToExcelRow(item));
+      const startLabel = this.getMonthName(startMonth).slice(0, 3);
+      const endLabel = this.getMonthName(endMonth).slice(0, 3);
+      const fileName = startMonth === endMonth
+        ? `Bukti_Potong_${year}_${startLabel}.xlsx`
+        : `Bukti_Potong_${year}_${startLabel}-${endLabel}.xlsx`;
+
+      this.excelExporter.export(excelRows, fileName);
+
+      const message = `Selesai. ${allSlips.length} Bukti Potong (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
+      this.showFinalNotification(message, []);
+      return { success: true, message, count: allSlips.length, fileName };
     }
 
     isCompatiblePage() {

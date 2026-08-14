@@ -4,16 +4,22 @@ class PopupManager {
       this.excelOnlyBtn = document.getElementById("excel-only-btn");
       this.pdfOnlyBtn = document.getElementById("pdf-only-btn");
       this.downloadExcelBtn = document.getElementById("download-excel-btn");
+      this.multiPeriodBtn = document.getElementById("multi-period-btn");
+      this.multiYearInput = document.getElementById("multi-year");
+      this.multiStartMonth = document.getElementById("multi-start-month");
+      this.multiEndMonth = document.getElementById("multi-end-month");
       this.statusText = document.getElementById("status-text");
       this.initialize();
     });
   }
 
   initialize() {
-    if (!this.excelOnlyBtn || !this.pdfOnlyBtn || !this.downloadExcelBtn) {
+    if (!this.excelOnlyBtn || !this.pdfOnlyBtn || !this.downloadExcelBtn || !this.multiPeriodBtn) {
       this.setStatus("Tombol proses tidak ditemukan.");
       return;
     }
+
+    this.populateMonthOptions();
 
     this.excelOnlyBtn.addEventListener("click", () => {
       this.handleProcess({
@@ -35,6 +41,76 @@ class PopupManager {
         loadingMessage: "Download PDF dan membuat Excel..."
       });
     });
+
+    this.multiPeriodBtn.addEventListener("click", () => {
+      this.handleMultiPeriodProcess();
+    });
+  }
+
+  populateMonthOptions() {
+    const months = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    [this.multiStartMonth, this.multiEndMonth].forEach((select) => {
+      if (!select) return;
+      select.innerHTML = "";
+      months.forEach((name, index) => {
+        const option = document.createElement("option");
+        option.value = String(index + 1);
+        option.textContent = name;
+        select.appendChild(option);
+      });
+    });
+
+    if (this.multiStartMonth) this.multiStartMonth.value = "1";
+    if (this.multiEndMonth) this.multiEndMonth.value = "2";
+  }
+
+  async handleMultiPeriodProcess() {
+    try {
+      const year = Number(this.multiYearInput?.value);
+      const startMonth = Number(this.multiStartMonth?.value);
+      const endMonth = Number(this.multiEndMonth?.value);
+
+      if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+        throw new Error("Tahun tidak valid.");
+      }
+      if (!Number.isInteger(startMonth) || !Number.isInteger(endMonth) || startMonth < 1 || endMonth > 12) {
+        throw new Error("Rentang bulan tidak valid.");
+      }
+      if (startMonth > endMonth) {
+        throw new Error("Bulan awal tidak boleh lebih besar dari bulan akhir.");
+      }
+
+      this.setLoading(true, "Mengambil Faktur Keluaran multi periode...");
+
+      const activeTab = await this.getActiveTab();
+      if (!activeTab?.id || !this.isCoreTaxHost(activeTab)) {
+        throw new Error("Buka halaman CoreTax Faktur Keluaran terlebih dahulu.");
+      }
+
+      await this.ensureContentScriptInjected(activeTab.id);
+
+      const response = await this.sendMessageToContent(activeTab.id, {
+        action: "downloadMultiPeriodInvoices",
+        year,
+        startMonth,
+        endMonth
+      });
+
+      if (response?.success === false) {
+        throw new Error(response.message || "Gagal mengambil data multi periode.");
+      }
+
+      this.setStatus(response?.message || "Excel multi periode selesai dibuat.");
+    } catch (error) {
+      console.error("KESALAHAN MULTI PERIODE:", error);
+      this.setStatus(`Gagal: ${error.message || error}`);
+    } finally {
+      this.setLoading(false);
+    }
   }
 
   async handleProcess({ mode, loadingMessage }) {
@@ -261,6 +337,15 @@ class PopupManager {
       this.downloadExcelBtn.textContent = isLoading ? "Memproses..." : "Download PDF + Buat Excel";
     }
 
+    if (this.multiPeriodBtn) {
+      this.multiPeriodBtn.disabled = isLoading;
+      this.multiPeriodBtn.textContent = isLoading ? "Memproses Multi Periode..." : "Download Excel Multi Periode";
+    }
+
+    if (this.multiYearInput) this.multiYearInput.disabled = isLoading;
+    if (this.multiStartMonth) this.multiStartMonth.disabled = isLoading;
+    if (this.multiEndMonth) this.multiEndMonth.disabled = isLoading;
+
     if (message) this.setStatus(message);
   }
 
@@ -268,13 +353,14 @@ class PopupManager {
     if (this.excelOnlyBtn) this.excelOnlyBtn.disabled = !isEnabled;
     if (this.pdfOnlyBtn) this.pdfOnlyBtn.disabled = !isEnabled;
     if (this.downloadExcelBtn) this.downloadExcelBtn.disabled = !isEnabled;
+    if (this.multiPeriodBtn) this.multiPeriodBtn.disabled = !isEnabled;
   }
 
   setStatus(message) {
     if (this.statusText) {
       this.statusText.textContent = message;
       this.statusText.classList.toggle("is-error", /^Gagal/i.test(message));
-      this.statusText.classList.toggle("is-ready", /^Siap/i.test(message));
+      this.statusText.classList.toggle("is-ready", /^(Siap|Selesai)/i.test(message));
     }
   }
 }

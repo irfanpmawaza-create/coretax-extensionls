@@ -29,6 +29,31 @@
     Pilih <b>Buat Excel Saja</b> jika PDF tidak ingin disimpan.
   </p>
 
+  <div class="popup-section-divider"></div>
+
+  <section class="multi-period-section">
+    <div class="multi-period-title">Faktur Keluaran Multi Periode</div>
+    <p class="multi-period-hint">Gabungkan beberapa masa pajak langsung ke satu file Excel.</p>
+
+    <label class="popup-field-label" for="multi-year">Tahun</label>
+    <input id="multi-year" class="popup-field" type="number" min="2020" max="2100" value="2026">
+
+    <div class="popup-field-row">
+      <div>
+        <label class="popup-field-label" for="multi-start-month">Dari Bulan</label>
+        <select id="multi-start-month" class="popup-field"></select>
+      </div>
+      <div>
+        <label class="popup-field-label" for="multi-end-month">Sampai Bulan</label>
+        <select id="multi-end-month" class="popup-field"></select>
+      </div>
+    </div>
+
+    <button id="multi-period-btn" class="popup-download-btn multi-period-btn">
+      Download Excel Multi Periode
+    </button>
+  </section>
+
   <div class="popup-disclaimer">
     <div class="popup-disclaimer-title">Catatan / Disclaimer</div>
     <ul>
@@ -39,7 +64,7 @@
 
   <div class="popup-footer">
     <div class="popup-divider"></div>
-    <p class="popup-version">(v1.0.2 Full)</p>
+    <p class="popup-version">(v1.1.0 Multi Periode)</p>
   </div>
 
     <script src="popup.js"></script>

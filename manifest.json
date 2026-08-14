@@ -1,18 +1,18 @@
 {
   "manifest_version": 3,
   "name": "CoreTax PDF Downloader & Ekspor Excel",
-  "version": "1.0.2",
-  "version_name": "1.0.2 Full",
+  "version": "1.1.0",
+  "version_name": "1.1.0 Multi Periode",
   "description": "Membantu mengunduh dokumen PDF CoreTax dan mengekspor hasil ekstrak data ke Excel.",
   "permissions": [
     "activeTab",
     "scripting",
-    "downloads"
+    "downloads",
+    "webRequest"
   ],
   "host_permissions": [
     "https://coretaxdjp.pajak.go.id/*"
   ],
-
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -43,7 +43,6 @@
       "48": "icon48.png",
       "128": "icon128.png"
     },
-
     "default_popup": "popup.html"
   },
   "web_accessible_resources": [

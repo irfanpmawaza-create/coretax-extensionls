@@ -153,3 +153,66 @@ h2 {
   margin: 0;
   text-align: left;
 }
+
+/* Faktur Keluaran Multi Periode */
+.popup-section-divider {
+  width: 100%;
+  height: 1px;
+  background: #d7d7d7;
+  margin: 14px 0;
+}
+
+.multi-period-section {
+  text-align: left;
+  margin-bottom: 14px;
+}
+
+.multi-period-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 4px;
+}
+
+.multi-period-hint {
+  margin: 0 0 10px;
+  color: #666;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.popup-field-label {
+  display: block;
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #444;
+}
+
+.popup-field {
+  width: 100%;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 5px 8px;
+  margin: 0 0 10px;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  font-size: 12px;
+}
+
+.popup-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.multi-period-btn {
+  margin: 2px 0 0 !important;
+  background-color: #173a70;
+}
+
+.multi-period-btn:hover {
+  background-color: #102a52;
+}
