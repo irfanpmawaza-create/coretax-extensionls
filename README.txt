@@ -49,3 +49,8 @@ Checklist uji fitur Multi Periode:
 Disclaimer:
 - Pengguna wajib mengecek kembali hasil ekstrak sebelum digunakan untuk pekerjaan/perpajakan.
 - Extension hanya berjalan di domain CoreTax dan tidak mengirim data ke server eksternal.
+
+Dokumen legal:
+- Syarat dan Ketentuan Layanan: SYARAT_DAN_KETENTUAN.md
+- Kebijakan Privasi: KEBIJAKAN_PRIVASI.md
+(Kedua dokumen masih berstatus draft dan belum ditinjau penasihat hukum.)
