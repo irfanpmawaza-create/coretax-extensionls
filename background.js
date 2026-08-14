@@ -358,7 +358,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Fitur Bukti Potong (Withholding Slips) Multi Periode
 // Pola sama dengan Faktur Keluaran di atas.
 // ============================================================
-const WITHHOLDING_SLIP_LIST_URL = "https://coretaxdjp.pajak.go.id/withholdingslipsportal/api/getebupotmpissued";
+// Endpoint list bukti potong beda-beda per jenis (MP, BP21, BP23, dst),
+// semua berpola ".../withholdingslipsportal/api/getebupot...issued".
+// Ditangkap generik berdasarkan pola URL, bukan nama endpoint yang di-hardcode.
+const WITHHOLDING_SLIP_API_PATTERN = "https://coretaxdjp.pajak.go.id/withholdingslipsportal/api/*";
 const withholdingSlipContexts = new Map();
 
 function getWithholdingSlipContext(tabId) {
@@ -366,29 +369,37 @@ function getWithholdingSlipContext(tabId) {
     withholdingSlipContexts.set(tabId, {
       authorization: "",
       payloadTemplate: null,
+      endpoint: "",
       capturedAt: 0
     });
   }
   return withholdingSlipContexts.get(tabId);
 }
 
+function isWithholdingSlipIssuedListUrl(url) {
+  return /\/withholdingslipsportal\/api\/getebupot\w*issued/i.test(url || "");
+}
+
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
     if (details.method !== "POST" || details.tabId < 0) return;
+    if (!isWithholdingSlipIssuedListUrl(details.url)) return;
     const payload = decodeRequestBody(details);
     if (!payload) return;
 
     const context = getWithholdingSlipContext(details.tabId);
     context.payloadTemplate = payload;
+    context.endpoint = details.url;
     context.capturedAt = now();
   },
-  { urls: [WITHHOLDING_SLIP_LIST_URL] },
+  { urls: [WITHHOLDING_SLIP_API_PATTERN] },
   ["requestBody"]
 );
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {
     if (details.method !== "POST" || details.tabId < 0) return;
+    if (!isWithholdingSlipIssuedListUrl(details.url)) return;
     const authorizationHeader = (details.requestHeaders || []).find(
       (header) => String(header.name || "").toLowerCase() === "authorization"
     );
@@ -399,11 +410,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     context.authorization = authorizationHeader.value;
     context.capturedAt = now();
   },
-  { urls: [WITHHOLDING_SLIP_LIST_URL] },
+  { urls: [WITHHOLDING_SLIP_API_PATTERN] },
   ["requestHeaders", "extraHeaders"]
 );
 
-async function executeWithholdingSlipFetch(tabId, authorization, payload) {
+async function executeWithholdingSlipFetch(tabId, authorization, payload, endpoint) {
   const injectionResults = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
@@ -434,7 +445,7 @@ async function executeWithholdingSlipFetch(tabId, authorization, payload) {
         data
       };
     },
-    args: [WITHHOLDING_SLIP_LIST_URL, authorization, payload]
+    args: [endpoint, authorization, payload]
   });
 
   return injectionResults?.[0]?.result || null;
@@ -450,7 +461,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   const context = withholdingSlipContexts.get(tabId);
-  if (!context?.authorization || !context?.payloadTemplate) {
+  if (!context?.authorization || !context?.payloadTemplate || !context?.endpoint) {
     sendResponse({
       success: false,
       code: "CONTEXT_NOT_CAPTURED",
@@ -493,7 +504,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     LanguageId: base.LanguageId || "id-ID"
   };
 
-  executeWithholdingSlipFetch(tabId, context.authorization, payload)
+  executeWithholdingSlipFetch(tabId, context.authorization, payload, context.endpoint)
     .then((result) => {
       if (!result) {
         sendResponse({ success: false, message: "CoreTax tidak mengembalikan hasil." });

@@ -610,10 +610,10 @@
         "Nama Dipotong": item.Name || "",
         "Kode Objek Pajak": item.TaxObjectCode || "",
         "Pasal": item.TaxArticle || "",
-        "Penghasilan Bruto": item.GrossIncome ?? 0,
+        "Penghasilan Bruto": item.GrossIncome ?? "",
         "Dasar Pengenaan Pajak": item.TaxBase ?? 0,
         "Tarif": item.TaxRate ?? 0,
-        "PPh Dipotong": item.IncomeTaxWithheld ?? 0,
+        "PPh Dipotong": item.IncomeTaxWithheld ?? item.IncomeTax ?? 0,
         "Status": item.WithholdingSlipsStatus || "",
         "Tanggal Dibuat": this.formatApiDate(item.CreationDate)
       };
