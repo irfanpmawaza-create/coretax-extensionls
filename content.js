@@ -215,6 +215,23 @@
       };
       const labelStyle = { fontSize: "11px", color: "#333" };
 
+      let typeSelect = null;
+      if (!isWithholdingPage) {
+        const typeLabel = document.createElement("label");
+        typeLabel.textContent = "Jenis Faktur";
+        Object.assign(typeLabel.style, labelStyle);
+        typeSelect = document.createElement("select");
+        Object.assign(typeSelect.style, fieldStyle);
+        [["output", "Faktur Keluaran"], ["input", "Faktur Masukan"]].forEach(([value, label]) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = label;
+          typeSelect.appendChild(option);
+        });
+        panel.appendChild(typeLabel);
+        panel.appendChild(typeSelect);
+      }
+
       const yearLabel = document.createElement("label");
       yearLabel.textContent = "Tahun";
       Object.assign(yearLabel.style, labelStyle);
@@ -270,7 +287,7 @@
         if (!processBtn.disabled) processBtn.style.backgroundColor = "#349e48";
       });
       processBtn.addEventListener("click", () => {
-        this.handleMultiPeriodToolbarClick(processBtn, yearInput, startMonthSelect, endMonthSelect);
+        this.handleMultiPeriodToolbarClick(processBtn, yearInput, startMonthSelect, endMonthSelect, typeSelect);
       });
 
       toggleBtn.addEventListener("click", () => {
@@ -290,7 +307,7 @@
       return section;
     }
 
-    async handleMultiPeriodToolbarClick(button, yearInput, startMonthSelect, endMonthSelect) {
+    async handleMultiPeriodToolbarClick(button, yearInput, startMonthSelect, endMonthSelect, typeSelect) {
       button.disabled = true;
       button.style.cursor = "not-allowed";
       const originalLabel = button.textContent;
@@ -300,7 +317,8 @@
         await this.downloadMultiPeriodInvoices({
           year: Number(yearInput.value),
           startMonth: Number(startMonthSelect.value),
-          endMonth: Number(endMonthSelect.value)
+          endMonth: Number(endMonthSelect.value),
+          invoiceType: typeSelect?.value || "output"
         });
       } catch (error) {
         console.error("KESALAHAN MULTI PERIODE:", error);
@@ -501,6 +519,10 @@
         throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
       }
 
+      if (options.invoiceType === "input") {
+        return this.downloadMultiPeriodInputInvoices(options);
+      }
+
       const year = Number(options.year);
       const startMonth = Number(options.startMonth);
       const endMonth = Number(options.endMonth);
@@ -534,6 +556,101 @@
       this.excelExporter.export(excelRows, fileName);
 
       const message = `Selesai. ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
+      this.showFinalNotification(message, []);
+      return { success: true, message, count: allInvoices.length, fileName };
+    }
+
+    async fetchInputInvoicePage({ periodCode, year, first, rows }) {
+      const result = await this.sendMessageToBackground({
+        action: "fetchInputInvoicesPage",
+        periodCode,
+        year,
+        first,
+        rows
+      });
+
+      if (!result?.success) {
+        throw new Error(result?.message || "Gagal mengambil data Faktur Masukan.");
+      }
+
+      const apiResponse = result.response;
+      if (!apiResponse?.IsSuccessful) {
+        throw new Error(apiResponse?.Message || "CoreTax mengembalikan status gagal.");
+      }
+
+      return apiResponse.Payload || { TotalRecords: 0, Data: [] };
+    }
+
+    async fetchAllInputInvoicesForMonth(month, year) {
+      const periodCode = this.getPeriodCode(month);
+      const rows = 50;
+      let first = 0;
+      let totalRecords = null;
+      const collected = [];
+      const seen = new Set();
+      let safety = 0;
+
+      while (safety < 500) {
+        safety++;
+        const payload = await this.fetchInputInvoicePage({ periodCode, year, first, rows });
+
+        const data = Array.isArray(payload.Data) ? payload.Data : [];
+        if (totalRecords === null && Number.isFinite(Number(payload.TotalRecords))) {
+          totalRecords = Number(payload.TotalRecords);
+        }
+
+        for (const item of data) {
+          const key = item.RecordId || item.AggregateIdentifier || `${item.TaxInvoiceNumber || ""}-${item.TaxInvoiceDate || ""}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            collected.push(item);
+          }
+        }
+
+        if (data.length === 0) break;
+        if (data.length < rows) break;
+        if (totalRecords !== null && first + data.length >= totalRecords) break;
+
+        first += rows;
+      }
+
+      return collected;
+    }
+
+    async downloadMultiPeriodInputInvoices(options = {}) {
+      const year = Number(options.year);
+      const startMonth = Number(options.startMonth);
+      const endMonth = Number(options.endMonth);
+
+      if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+        throw new Error("Tahun tidak valid.");
+      }
+      if (!Number.isInteger(startMonth) || !Number.isInteger(endMonth) || startMonth < 1 || endMonth > 12 || startMonth > endMonth) {
+        throw new Error("Rentang bulan tidak valid.");
+      }
+
+      const allInvoices = [];
+      for (let month = startMonth; month <= endMonth; month++) {
+        console.log(`MULTI PERIODE MASUKAN: mengambil ${this.getMonthName(month)} ${year}...`);
+        const monthData = await this.fetchAllInputInvoicesForMonth(month, year);
+        allInvoices.push(...monthData);
+        console.log(`MULTI PERIODE MASUKAN: ${this.getMonthName(month)} = ${monthData.length} faktur.`);
+      }
+
+      if (allInvoices.length === 0) {
+        throw new Error("Tidak ada Faktur Masukan yang ditemukan untuk periode tersebut.");
+      }
+
+      const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
+      const startLabel = this.getMonthName(startMonth).slice(0, 3);
+      const endLabel = this.getMonthName(endMonth).slice(0, 3);
+      const fileName = startMonth === endMonth
+        ? `Faktur_Masukan_${year}_${startLabel}.xlsx`
+        : `Faktur_Masukan_${year}_${startLabel}-${endLabel}.xlsx`;
+
+      this.excelExporter.export(excelRows, fileName);
+
+      const message = `Selesai. ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
       this.showFinalNotification(message, []);
       return { success: true, message, count: allInvoices.length, fileName };
     }

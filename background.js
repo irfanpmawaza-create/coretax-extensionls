@@ -304,7 +304,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const upsertFilter = (propertyName, value) => {
     const existing = filters.find((item) => item.PropertyName === propertyName);
     if (existing) {
-      existing.Value = value;
+      existing.Value = Array.isArray(existing.Value) ? [value] : value;
     } else {
       filters.push({
         PropertyName: propertyName,
@@ -348,6 +348,174 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })
     .catch((error) => {
       console.error("Gagal mengambil Faktur Keluaran multi periode:", error);
+      sendResponse({ success: false, message: error.message || String(error) });
+    });
+
+  return true;
+});
+
+// ============================================================
+// Fitur Faktur Masukan Multi Periode
+// Pola sama dengan Faktur Keluaran di atas.
+// ============================================================
+const INPUT_INVOICE_LIST_URL = "https://coretaxdjp.pajak.go.id/einvoiceportal/api/inputinvoice/list";
+const inputInvoiceContexts = new Map();
+
+function getInputInvoiceContext(tabId) {
+  if (!inputInvoiceContexts.has(tabId)) {
+    inputInvoiceContexts.set(tabId, {
+      authorization: "",
+      payloadTemplate: null,
+      capturedAt: 0
+    });
+  }
+  return inputInvoiceContexts.get(tabId);
+}
+
+chrome.webRequest.onBeforeRequest.addListener(
+  (details) => {
+    if (details.method !== "POST" || details.tabId < 0) return;
+    const payload = decodeRequestBody(details);
+    if (!payload) return;
+
+    const context = getInputInvoiceContext(details.tabId);
+    context.payloadTemplate = payload;
+    context.capturedAt = now();
+  },
+  { urls: [INPUT_INVOICE_LIST_URL] },
+  ["requestBody"]
+);
+
+chrome.webRequest.onBeforeSendHeaders.addListener(
+  (details) => {
+    if (details.method !== "POST" || details.tabId < 0) return;
+    const authorizationHeader = (details.requestHeaders || []).find(
+      (header) => String(header.name || "").toLowerCase() === "authorization"
+    );
+
+    if (!authorizationHeader?.value) return;
+
+    const context = getInputInvoiceContext(details.tabId);
+    context.authorization = authorizationHeader.value;
+    context.capturedAt = now();
+  },
+  { urls: [INPUT_INVOICE_LIST_URL] },
+  ["requestHeaders", "extraHeaders"]
+);
+
+async function executeInputInvoiceFetch(tabId, authorization, payload) {
+  const injectionResults = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: async (endpoint, authHeader, requestPayload) => {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Accept": "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+          "Authorization": authHeader
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      const text = await response.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (_) {
+        data = { rawText: text };
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        data
+      };
+    },
+    args: [INPUT_INVOICE_LIST_URL, authorization, payload]
+  });
+
+  return injectionResults?.[0]?.result || null;
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action !== "fetchInputInvoicesPage") return;
+
+  const tabId = sender.tab?.id;
+  if (!Number.isInteger(tabId)) {
+    sendResponse({ success: false, message: "Tab CoreTax tidak ditemukan." });
+    return true;
+  }
+
+  const context = inputInvoiceContexts.get(tabId);
+  if (!context?.authorization || !context?.payloadTemplate) {
+    sendResponse({
+      success: false,
+      code: "CONTEXT_NOT_CAPTURED",
+      message: "Konteks API belum terbaca. Di halaman Faktur Masukan, ubah filter/refresh tabel sekali lalu coba lagi."
+    });
+    return true;
+  }
+
+  const periodCode = request.periodCode;
+  const year = String(request.year || "");
+  const first = Number(request.first || 0);
+  const rows = Number(request.rows || 50);
+
+  const base = context.payloadTemplate;
+  const filters = Array.isArray(base.Filters)
+    ? base.Filters.map((item) => ({ ...item }))
+    : [];
+
+  const upsertFilter = (propertyName, value) => {
+    const existing = filters.find((item) => item.PropertyName === propertyName);
+    if (existing) {
+      existing.Value = Array.isArray(existing.Value) ? [value] : value;
+    } else {
+      filters.push({
+        PropertyName: propertyName,
+        Value: value,
+        MatchMode: "equals",
+        CaseSensitive: true,
+        AsString: false
+      });
+    }
+  };
+
+  upsertFilter("TaxInvoicePeriod", periodCode);
+  upsertFilter("TaxInvoiceYear", year);
+
+  const payload = {
+    ...base,
+    First: first,
+    Rows: rows,
+    Filters: filters,
+    LanguageId: base.LanguageId || "id-ID"
+  };
+
+  executeInputInvoiceFetch(tabId, context.authorization, payload)
+    .then((result) => {
+      if (!result) {
+        sendResponse({ success: false, message: "CoreTax tidak mengembalikan hasil." });
+        return;
+      }
+
+      if (!result.ok) {
+        sendResponse({
+          success: false,
+          status: result.status,
+          message: `Request CoreTax gagal (${result.status} ${result.statusText || ""}).`.trim(),
+          response: result.data
+        });
+        return;
+      }
+
+      sendResponse({ success: true, response: result.data });
+    })
+    .catch((error) => {
+      console.error("Gagal mengambil Faktur Masukan multi periode:", error);
       sendResponse({ success: false, message: error.message || String(error) });
     });
 
