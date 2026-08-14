@@ -1,5 +1,5 @@
 class CoreTaxExcelExporter {
-  export(rows, fileName = "PPN_hasil_ekstrak.xlsx") {
+  export(rows, fileName = "PPN_hasil_ekstrak.xlsx", sheetName = "PPN") {
     if (!window.XLSX) {
       throw new Error("Library SheetJS belum tersedia. Pastikan libs/xlsx.full.min.js sudah ada.");
     }
@@ -12,7 +12,7 @@ class CoreTaxExcelExporter {
     worksheet["!cols"] = this.buildColumnWidths(rows);
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "PPN");
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
     const excelArray = XLSX.write(workbook, {
       bookType: "xlsx",

@@ -553,7 +553,7 @@
         ? `Faktur_Keluaran_${year}_${startLabel}.xlsx`
         : `Faktur_Keluaran_${year}_${startLabel}-${endLabel}.xlsx`;
 
-      this.excelExporter.export(excelRows, fileName);
+      this.excelExporter.export(excelRows, fileName, "output");
 
       const message = `Selesai. ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
       this.showFinalNotification(message, []);
@@ -648,7 +648,7 @@
         ? `Faktur_Masukan_${year}_${startLabel}.xlsx`
         : `Faktur_Masukan_${year}_${startLabel}-${endLabel}.xlsx`;
 
-      this.excelExporter.export(excelRows, fileName);
+      this.excelExporter.export(excelRows, fileName, "output");
 
       const message = `Selesai. ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
       this.showFinalNotification(message, []);
@@ -767,7 +767,7 @@
         ? `Bukti_Potong_${year}_${startLabel}.xlsx`
         : `Bukti_Potong_${year}_${startLabel}-${endLabel}.xlsx`;
 
-      this.excelExporter.export(excelRows, fileName);
+      this.excelExporter.export(excelRows, fileName, "output");
 
       const message = `Selesai. ${allSlips.length} Bukti Potong (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
       this.showFinalNotification(message, []);
