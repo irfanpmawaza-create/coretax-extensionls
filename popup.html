@@ -6,9 +6,9 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <img class="popup-logo" src="kapls.png" alt="logo_kap_LS">
+  <img class="popup-logo" src="kapls.png" alt="logo_kap_LS">
 
-  <h2>CoreTax PDF Downloader & Excel Extractor</h2>
+  <h2>CoreTax PDF Downloader &amp; Excel Extractor</h2>
 
   <p id="status-text" class="popup-status"></p>
 
@@ -20,7 +20,7 @@
     Buat Pdf Saja
   </button>
 
-  <button id="download-excel-btn" class="popup-download-btn">
+  <button id="download-excel-btn" class="popup-download-btn popup-btn-outline">
     Download PDF + Buat Excel
   </button>
 
@@ -31,38 +31,44 @@
 
   <div class="popup-section-divider"></div>
 
-  <section class="multi-period-section">
-    <div class="multi-period-title">Faktur Keluaran Multi Periode</div>
-    <p class="multi-period-hint">Gabungkan beberapa masa pajak langsung ke satu file Excel.</p>
+  <details class="multi-period-section">
+    <summary class="multi-period-title">
+      Faktur Keluaran Multi Periode
+      <span class="multi-period-chevron" aria-hidden="true">&#9660;</span>
+    </summary>
 
-    <label class="popup-field-label" for="multi-year">Tahun</label>
-    <input id="multi-year" class="popup-field" type="number" min="2020" max="2100" value="2026">
+    <div class="multi-period-body">
+      <p class="multi-period-hint">Gabungkan beberapa masa pajak langsung ke satu file Excel.</p>
 
-    <div class="popup-field-row">
-      <div>
-        <label class="popup-field-label" for="multi-start-month">Dari Bulan</label>
-        <select id="multi-start-month" class="popup-field"></select>
+      <label class="popup-field-label" for="multi-year">Tahun</label>
+      <input id="multi-year" class="popup-field" type="number" min="2020" max="2100" value="2026">
+
+      <div class="popup-field-row">
+        <div>
+          <label class="popup-field-label" for="multi-start-month">Dari Bulan</label>
+          <select id="multi-start-month" class="popup-field"></select>
+        </div>
+        <div>
+          <label class="popup-field-label" for="multi-end-month">Sampai Bulan</label>
+          <select id="multi-end-month" class="popup-field"></select>
+        </div>
       </div>
-      <div>
-        <label class="popup-field-label" for="multi-end-month">Sampai Bulan</label>
-        <select id="multi-end-month" class="popup-field"></select>
-      </div>
+
+      <label class="popup-field-label popup-check-label">
+        <input id="multi-save-pdf" type="checkbox">
+        Simpan PDF juga
+      </label>
+
+      <label class="popup-field-label popup-check-label">
+        <input id="multi-build-item-excel" type="checkbox">
+        Excel rincian per barang (dari PDF)
+      </label>
+
+      <button id="multi-period-btn" class="popup-download-btn multi-period-btn">
+        Download Excel Multi Periode
+      </button>
     </div>
-
-    <label class="popup-field-label">
-      <input id="multi-save-pdf" type="checkbox">
-      Simpan PDF juga
-    </label>
-
-    <label class="popup-field-label">
-      <input id="multi-build-item-excel" type="checkbox">
-      Excel rincian per barang (dari PDF)
-    </label>
-
-    <button id="multi-period-btn" class="popup-download-btn multi-period-btn">
-      Download Excel Multi Periode
-    </button>
-  </section>
+  </details>
 
   <div class="popup-disclaimer">
     <div class="popup-disclaimer-title">Catatan / Disclaimer</div>
@@ -77,6 +83,6 @@
     <p class="popup-version">(v1.1.0 Multi Periode)</p>
   </div>
 
-    <script src="popup.js"></script>
+  <script src="popup.js"></script>
 </body>
 </html>

@@ -1,96 +1,119 @@
+:root {
+  --navy: #173a70;
+  --navy-hover: #102a52;
+  --excel-green: #1f8a4c;
+  --excel-green-hover: #197a41;
+  --pdf-red: #c62828;
+  --pdf-red-hover: #a91f1f;
+  --bg: #f5f7fa;
+  --text: #101623;
+  --muted: #5b6472;
+  --border: #dde1e7;
+  --surface: #eef1f5;
+}
+
 body {
-  font-family: "Segoe UI", Arial, sans-serif;
-  width: 260px;
-  padding: 12px;
+  font-family: "Segoe UI", system-ui, Arial, sans-serif;
+  width: 300px;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
   text-align: center;
 }
 
 h2 {
-  font-size: 18px;
-  margin: 10px 0 10px 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  margin: 0 0 14px;
 }
 
 .popup-logo {
-  width: 150px;
+  width: 84px;
   height: auto;
   display: block;
-  margin: 0 auto 8px auto;
-}
-
-.popup-logo-link {
-  text-decoration: none;
-}
-
-/* Container tombol, kalau popup.html sudah memakai pembungkus */
-.popup-button-group {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  margin-top: 16px;
-  margin-bottom: 24px;
+  margin: 0 auto 12px auto;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
 }
 
 .popup-download-btn {
   width: 100%;
-  padding: 12px 16px;
-  font-size: 15px;
-  font-weight: bold;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  background-color: #d00000;
-  color: white;
+  background-color: var(--navy);
+  color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   box-sizing: border-box;
-
-  /* Tetap kasih jarak walaupun tombol tidak dibungkus popup-button-group */
   display: block;
-  margin: 0 0 18px 0;
-}
-
-/* Jarak bawah tombol terakhir ke catatan */
-.popup-download-btn:last-of-type {
-  margin-bottom: 24px;
+  margin: 0 0 10px 0;
 }
 
 .popup-download-btn:hover {
-  background-color: #b00000;
+  background-color: var(--navy-hover);
 }
 
 #excel-only-btn {
-  background-color: #349e48;
+  background-color: var(--excel-green);
 }
 
 #excel-only-btn:hover {
-  background-color: #2a7d3a;
+  background-color: var(--excel-green-hover);
+}
+
+#pdf-only-btn {
+  background-color: var(--pdf-red);
+}
+
+#pdf-only-btn:hover {
+  background-color: var(--pdf-red-hover);
+}
+
+.popup-btn-outline {
+  background-color: #fff;
+  color: var(--navy);
+  border: 1.5px solid var(--navy);
+}
+
+.popup-btn-outline:hover {
+  background-color: var(--bg);
 }
 
 .popup-download-btn:disabled {
-  background-color: #999;
+  background-color: #99a1ab;
+  color: #fff;
+  border-color: transparent;
   cursor: not-allowed;
 }
 
 .popup-note {
   font-size: 12px;
-  color: #555;
-  line-height: 1.4;
-  margin: 0 0 10px 0;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 4px 0 12px 0;
 }
 
 .popup-disclaimer {
   margin-top: 10px;
-  padding: 10px 10px;
-  background-color: #f7f7f7;
-  border: 1px solid #dddddd;
-  border-radius: 8px;
+  padding: 10px 12px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
   text-align: left;
-  color: #444;
+  color: #454e5a;
 }
 
 .popup-disclaimer-title {
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 700;
   margin-bottom: 6px;
-  color: #333;
+  color: var(--text);
 }
 
 .popup-disclaimer ul {
@@ -100,7 +123,7 @@ h2 {
 
 .popup-disclaimer li {
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.4;
   margin-bottom: 5px;
 }
 
@@ -113,11 +136,10 @@ h2 {
   box-sizing: border-box;
   width: 100%;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 12px;
-  font-weight: bold;
-  color: #333;
-  margin: 0 0 14px 0;
+  font-weight: 700;
+  margin: 0 0 12px 0;
   line-height: 1.35;
   text-align: center;
 }
@@ -125,8 +147,8 @@ h2 {
 .popup-status.is-error {
   display: block;
   color: #8f0000;
-  background-color: #fff0f0;
-  border: 1px solid #d00000;
+  background-color: #fdeeee;
+  border: 1px solid var(--pdf-red);
 }
 
 .popup-status.is-ready {
@@ -143,40 +165,70 @@ h2 {
 .popup-divider {
   width: 100%;
   height: 1px;
-  background-color: #bdbdbd;
+  background-color: var(--border);
   margin: 12px 0 10px 0;
 }
 
 .popup-version {
   font-size: 9px;
-  color: #777;
+  color: #8a93a0;
   margin: 0;
-  text-align: left;
+  text-align: right;
 }
 
 /* Faktur Keluaran Multi Periode */
 .popup-section-divider {
   width: 100%;
   height: 1px;
-  background: #d7d7d7;
+  background: var(--border);
   margin: 14px 0;
 }
 
 .multi-period-section {
   text-align: left;
   margin-bottom: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
 }
 
 .multi-period-title {
-  font-size: 14px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
   font-weight: 700;
-  color: #222;
-  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.multi-period-title::-webkit-details-marker {
+  display: none;
+}
+
+.multi-period-chevron {
+  font-size: 10px;
+  color: var(--navy);
+  transition: transform 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.multi-period-section[open] .multi-period-chevron {
+  transform: rotate(180deg);
+}
+
+.multi-period-body {
+  padding: 0 12px 12px;
 }
 
 .multi-period-hint {
   margin: 0 0 10px;
-  color: #666;
+  color: var(--muted);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -186,19 +238,32 @@ h2 {
   margin: 0 0 4px;
   font-size: 11px;
   font-weight: 600;
-  color: #444;
+  color: #333c48;
+}
+
+.popup-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.popup-check-label input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
 }
 
 .popup-field {
   width: 100%;
   box-sizing: border-box;
-  height: 34px;
+  height: 32px;
   padding: 5px 8px;
   margin: 0 0 10px;
-  border: 1px solid #c8c8c8;
+  border: 1px solid #c7ced8;
   border-radius: 6px;
   background: #fff;
-  color: #222;
+  color: var(--text);
   font-size: 12px;
 }
 
@@ -210,9 +275,9 @@ h2 {
 
 .multi-period-btn {
   margin: 2px 0 0 !important;
-  background-color: #173a70;
+  background-color: var(--navy);
 }
 
 .multi-period-btn:hover {
-  background-color: #102a52;
+  background-color: var(--navy-hover);
 }
