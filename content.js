@@ -265,6 +265,25 @@
       Object.assign(endLabel.style, labelStyle);
       const endMonthSelect = makeMonthSelect(2);
 
+      const makeCheckboxLabel = (text) => {
+        const label = document.createElement("label");
+        Object.assign(label.style, { ...labelStyle, display: "flex", alignItems: "center", gap: "6px" });
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(text));
+        return { label, checkbox };
+      };
+
+      let savePdfCheckbox = null;
+      let savePdfLabel = null;
+      let buildItemExcelCheckbox = null;
+      let buildItemExcelLabel = null;
+      if (!isWithholdingPage) {
+        ({ label: savePdfLabel, checkbox: savePdfCheckbox } = makeCheckboxLabel("Simpan PDF juga"));
+        ({ label: buildItemExcelLabel, checkbox: buildItemExcelCheckbox } = makeCheckboxLabel("Excel rincian per barang (dari PDF)"));
+      }
+
       const processBtn = document.createElement("button");
       processBtn.textContent = "Proses Multi Periode";
       Object.assign(processBtn.style, {
@@ -287,7 +306,7 @@
         if (!processBtn.disabled) processBtn.style.backgroundColor = "#349e48";
       });
       processBtn.addEventListener("click", () => {
-        this.handleMultiPeriodToolbarClick(processBtn, yearInput, startMonthSelect, endMonthSelect, typeSelect);
+        this.handleMultiPeriodToolbarClick(processBtn, yearInput, startMonthSelect, endMonthSelect, typeSelect, savePdfCheckbox, buildItemExcelCheckbox);
       });
 
       toggleBtn.addEventListener("click", () => {
@@ -300,6 +319,8 @@
       panel.appendChild(startMonthSelect);
       panel.appendChild(endLabel);
       panel.appendChild(endMonthSelect);
+      if (savePdfLabel) panel.appendChild(savePdfLabel);
+      if (buildItemExcelLabel) panel.appendChild(buildItemExcelLabel);
       panel.appendChild(processBtn);
 
       section.appendChild(toggleBtn);
@@ -307,7 +328,7 @@
       return section;
     }
 
-    async handleMultiPeriodToolbarClick(button, yearInput, startMonthSelect, endMonthSelect, typeSelect) {
+    async handleMultiPeriodToolbarClick(button, yearInput, startMonthSelect, endMonthSelect, typeSelect, savePdfCheckbox, buildItemExcelCheckbox) {
       button.disabled = true;
       button.style.cursor = "not-allowed";
       const originalLabel = button.textContent;
@@ -318,7 +339,9 @@
           year: Number(yearInput.value),
           startMonth: Number(startMonthSelect.value),
           endMonth: Number(endMonthSelect.value),
-          invoiceType: typeSelect?.value || "output"
+          invoiceType: typeSelect?.value || "output",
+          savePdf: Boolean(savePdfCheckbox?.checked),
+          buildItemExcel: Boolean(buildItemExcelCheckbox?.checked)
         });
       } catch (error) {
         console.error("KESALAHAN MULTI PERIODE:", error);
@@ -506,6 +529,77 @@
       };
     }
 
+    base64ToBlob(base64, mimeType) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mimeType || "application/pdf" });
+    }
+
+    async fetchInvoicePdfBlob(item, invoiceType) {
+      const body = {
+        EInvoiceRecordIdentifier: item.RecordId || "",
+        EInvoiceAggregateIdentifier: item.AggregateIdentifier || "",
+        DocumentAggregateIdentifier: item.DocumentFormAggregateIdentifier || "",
+        LetterNumber: item.TaxInvoiceNumber || "",
+        DocumentDate: item.TaxInvoiceDate || "",
+        EInvoiceMenuType: invoiceType === "input" ? "Incoming" : "Outgoing",
+        TaxInvoiceStatus: item.TaxInvoiceStatus || ""
+      };
+
+      const result = await this.sendMessageToBackground({ action: "fetchInvoicePdf", invoiceType, body });
+      if (!result?.success) {
+        throw new Error(result?.message || "Gagal mengambil PDF faktur.");
+      }
+
+      let blob;
+      if (result.isJson) {
+        const base64 = result.data?.Content || result.data?.Payload?.FileContent || result.data?.Payload?.Base64 || result.data?.Payload;
+        if (typeof base64 !== "string") {
+          throw new Error(result.data?.Message || "Respons PDF tidak dikenali.");
+        }
+        blob = this.base64ToBlob(base64, "application/pdf");
+      } else {
+        blob = this.base64ToBlob(result.base64, result.contentType);
+      }
+
+      const periodMonth = Number(String(item.TaxInvoicePeriod || "").slice(-2));
+      const monthAbbr = this.cleanFileName(this.getMonthName(periodMonth).slice(0, 3));
+      const counterpartyName = this.cleanFileName(
+        invoiceType === "input"
+          ? (item.SellerTaxpayerName || "")
+          : (item.BuyerTaxpayerNameClear || item.BuyerName || item.DisplayName || item.BuyerTaxpayerName || "")
+      );
+      const taxInvoiceNumber = this.cleanFileName(item.TaxInvoiceNumber || "FAKTUR");
+      const fileName = `${taxInvoiceNumber}_${counterpartyName}_${monthAbbr}${item.TaxInvoiceYear || ""}.pdf`;
+
+      return { blob, fileName };
+    }
+
+    async downloadInvoicePdfsForItems(allInvoices, invoiceType, { savePdf, buildItemExcel }) {
+      const failedPdfs = [];
+      const itemExcelRows = [];
+      let pdfSuccessCount = 0;
+
+      for (const item of allInvoices) {
+        try {
+          const { blob, fileName } = await this.fetchInvoicePdfBlob(item, invoiceType);
+          if (savePdf) this.downloadBlob(blob, fileName);
+          if (buildItemExcel) {
+            const arrayBuffer = await blob.arrayBuffer();
+            const rows = await this.pdfExtractor.extract(arrayBuffer, fileName);
+            itemExcelRows.push(...rows);
+          }
+          pdfSuccessCount++;
+        } catch (error) {
+          failedPdfs.push({ number: item.TaxInvoiceNumber || "?", reason: error.message || String(error) });
+        }
+        await this.sleep(this.delayBetweenDownloads);
+      }
+
+      return { pdfSuccessCount, failedPdfs, itemExcelRows };
+    }
+
     async downloadMultiPeriodInvoices(options = {}) {
       if (!this.isCompatiblePage()) {
         throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
@@ -555,8 +649,28 @@
 
       this.excelExporter.export(excelRows, fileName, "output");
 
-      const message = `Selesai. ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
-      this.showFinalNotification(message, []);
+      let message = `Selesai. ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
+      let failedPdfs = [];
+
+      if (options.savePdf || options.buildItemExcel) {
+        const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, "output", {
+          savePdf: options.savePdf,
+          buildItemExcel: options.buildItemExcel
+        });
+        failedPdfs = pdfResult.failedPdfs;
+        if (options.savePdf) {
+          message += `\nPDF tersimpan: ${pdfResult.pdfSuccessCount}, PDF gagal: ${failedPdfs.length}.`;
+        }
+        if (options.buildItemExcel && pdfResult.itemExcelRows.length > 0) {
+          const itemFileName = startMonth === endMonth
+            ? `Faktur_Keluaran_Rincian_${year}_${startLabel}.xlsx`
+            : `Faktur_Keluaran_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
+          this.excelExporter.export(pdfResult.itemExcelRows, itemFileName);
+          message += `\nExcel rincian per barang: ${pdfResult.itemExcelRows.length} baris (${itemFileName}).`;
+        }
+      }
+
+      this.showFinalNotification(message, failedPdfs);
       return { success: true, message, count: allInvoices.length, fileName };
     }
 
@@ -650,8 +764,28 @@
 
       this.excelExporter.export(excelRows, fileName, "output");
 
-      const message = `Selesai. ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
-      this.showFinalNotification(message, []);
+      let message = `Selesai. ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
+      let failedPdfs = [];
+
+      if (options.savePdf || options.buildItemExcel) {
+        const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, "input", {
+          savePdf: options.savePdf,
+          buildItemExcel: options.buildItemExcel
+        });
+        failedPdfs = pdfResult.failedPdfs;
+        if (options.savePdf) {
+          message += `\nPDF tersimpan: ${pdfResult.pdfSuccessCount}, PDF gagal: ${failedPdfs.length}.`;
+        }
+        if (options.buildItemExcel && pdfResult.itemExcelRows.length > 0) {
+          const itemFileName = startMonth === endMonth
+            ? `Faktur_Masukan_Rincian_${year}_${startLabel}.xlsx`
+            : `Faktur_Masukan_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
+          this.excelExporter.export(pdfResult.itemExcelRows, itemFileName);
+          message += `\nExcel rincian per barang: ${pdfResult.itemExcelRows.length} baris (${itemFileName}).`;
+        }
+      }
+
+      this.showFinalNotification(message, failedPdfs);
       return { success: true, message, count: allInvoices.length, fileName };
     }
 

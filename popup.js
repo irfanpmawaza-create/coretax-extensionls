@@ -8,6 +8,8 @@ class PopupManager {
       this.multiYearInput = document.getElementById("multi-year");
       this.multiStartMonth = document.getElementById("multi-start-month");
       this.multiEndMonth = document.getElementById("multi-end-month");
+      this.multiSavePdf = document.getElementById("multi-save-pdf");
+      this.multiBuildItemExcel = document.getElementById("multi-build-item-excel");
       this.statusText = document.getElementById("status-text");
       this.initialize();
     });
@@ -97,7 +99,9 @@ class PopupManager {
         action: "downloadMultiPeriodInvoices",
         year,
         startMonth,
-        endMonth
+        endMonth,
+        savePdf: Boolean(this.multiSavePdf?.checked),
+        buildItemExcel: Boolean(this.multiBuildItemExcel?.checked)
       });
 
       if (response?.success === false) {
