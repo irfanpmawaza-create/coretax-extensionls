@@ -25,6 +25,7 @@ class CoreTaxPdfExtractor {
     const kodeFaktur = this.extractKodeFaktur(fullText);
     const lawanTransaksi = this.extractLawanTransaksi(fullText);
     const npwpLawan = this.extractNpwpLawan(fullText);
+    const potonganHarga = this.extractPotonganHarga(fullText);
     const dasarPengenaanPajak = this.extractDasarPengenaanPajak(fullText);
     const jumlahPpn = this.extractJumlahPpn(fullText);
     const itemRows = this.extractItemRows(allLines);
@@ -38,6 +39,7 @@ class CoreTaxPdfExtractor {
         "Lawan Transaksi": lawanTransaksi,
         "NPWP Lawan Transaksi": npwpLawan,
         "Harga Jual / Penggantian /  Uang Muka / Termin": null,
+        "Potongan Harga": potonganHarga,
         "Dasar Pengenaan Pajak": dasarPengenaanPajak,
         "Jumlah PPN (Pajak Pertambahan Nilai)": jumlahPpn,
         "Catatan": "Item tidak terbaca. Periksa struktur PDF."
@@ -51,6 +53,7 @@ class CoreTaxPdfExtractor {
       "Lawan Transaksi": lawanTransaksi,
       "NPWP Lawan Transaksi": npwpLawan,
       "Harga Jual / Penggantian /  Uang Muka / Termin": item.amount,
+      "Potongan Harga": potonganHarga,
       "Dasar Pengenaan Pajak": dasarPengenaanPajak,
       "Jumlah PPN (Pajak Pertambahan Nilai)": jumlahPpn,
       "Catatan": ""
@@ -119,6 +122,10 @@ class CoreTaxPdfExtractor {
 
   extractJumlahPpn(text) {
     return this.extractSummaryAmount(text, /Jumlah\s+PPN(?:\s*\(\s*Pajak\s+Pertambahan\s+Nilai\s*\))?/i);
+  }
+
+  extractPotonganHarga(text) {
+    return this.extractSummaryAmount(text, /Dikurangi\s+Potongan\s+Harga/i);
   }
 
   extractSummaryAmount(text, labelPattern) {

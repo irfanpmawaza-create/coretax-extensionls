@@ -640,14 +640,11 @@
         throw new Error("Tidak ada Faktur Keluaran yang ditemukan untuk periode tersebut.");
       }
 
-      const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
       const startLabel = this.getMonthName(startMonth).slice(0, 3);
       const endLabel = this.getMonthName(endMonth).slice(0, 3);
       const fileName = startMonth === endMonth
         ? `Faktur_Keluaran_${year}_${startLabel}.xlsx`
         : `Faktur_Keluaran_${year}_${startLabel}-${endLabel}.xlsx`;
-
-      this.excelExporter.export(excelRows, fileName, "output");
 
       let message = `Selesai. ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
       let failedPdfs = [];
@@ -668,6 +665,11 @@
           this.excelExporter.export(pdfResult.itemExcelRows, itemFileName);
           message += `\nExcel rincian per barang: ${pdfResult.itemExcelRows.length} baris (${itemFileName}).`;
         }
+      }
+
+      if (!options.savePdf && !options.buildItemExcel) {
+        const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
+        this.excelExporter.export(excelRows, fileName, "output");
       }
 
       this.showFinalNotification(message, failedPdfs);
@@ -755,14 +757,11 @@
         throw new Error("Tidak ada Faktur Masukan yang ditemukan untuk periode tersebut.");
       }
 
-      const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
       const startLabel = this.getMonthName(startMonth).slice(0, 3);
       const endLabel = this.getMonthName(endMonth).slice(0, 3);
       const fileName = startMonth === endMonth
         ? `Faktur_Masukan_${year}_${startLabel}.xlsx`
         : `Faktur_Masukan_${year}_${startLabel}-${endLabel}.xlsx`;
-
-      this.excelExporter.export(excelRows, fileName, "output");
 
       let message = `Selesai. ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
       let failedPdfs = [];
@@ -783,6 +782,11 @@
           this.excelExporter.export(pdfResult.itemExcelRows, itemFileName);
           message += `\nExcel rincian per barang: ${pdfResult.itemExcelRows.length} baris (${itemFileName}).`;
         }
+      }
+
+      if (!options.savePdf && !options.buildItemExcel) {
+        const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
+        this.excelExporter.export(excelRows, fileName, "output");
       }
 
       this.showFinalNotification(message, failedPdfs);
