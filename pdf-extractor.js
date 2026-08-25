@@ -25,6 +25,7 @@ class CoreTaxPdfExtractor {
     const kodeFaktur = this.extractKodeFaktur(fullText);
     const lawanTransaksi = this.extractLawanTransaksi(fullText);
     const npwpLawan = this.extractNpwpLawan(fullText);
+    const alamatLawan = this.extractAlamatLawan(fullText);
     const potonganHarga = this.extractPotonganHarga(fullText);
     const dasarPengenaanPajak = this.extractDasarPengenaanPajak(fullText);
     const jumlahPpn = this.extractJumlahPpn(fullText);
@@ -38,6 +39,7 @@ class CoreTaxPdfExtractor {
         "Nama Barang Kena Pajak / Jasa Kena Pajak": "",
         "Lawan Transaksi": lawanTransaksi,
         "NPWP Lawan Transaksi": npwpLawan,
+        "Alamat Lawan Transaksi": alamatLawan,
         "Harga Jual / Penggantian /  Uang Muka / Termin": null,
         "Potongan Harga": potonganHarga,
         "Dasar Pengenaan Pajak": dasarPengenaanPajak,
@@ -52,6 +54,7 @@ class CoreTaxPdfExtractor {
       "Nama Barang Kena Pajak / Jasa Kena Pajak": item.description,
       "Lawan Transaksi": lawanTransaksi,
       "NPWP Lawan Transaksi": npwpLawan,
+      "Alamat Lawan Transaksi": alamatLawan,
       "Harga Jual / Penggantian /  Uang Muka / Termin": item.amount,
       "Potongan Harga": potonganHarga,
       "Dasar Pengenaan Pajak": dasarPengenaanPajak,
@@ -114,6 +117,15 @@ class CoreTaxPdfExtractor {
     const buyerSection = this.getBuyerSection(text);
     const match = buyerSection.match(/NPWP\s*:\s*([0-9.\-]+)/i);
     return match ? this.cleanText(match[1]).replace(/[^0-9]/g, "") : "";
+  }
+
+  //ekstrak alamat pembeli, bisa nyambung ke baris berikutnya (wrap) sebelum baris NPWP
+  extractAlamatLawan(text) {
+    const buyerSection = this.getBuyerSection(text);
+    const match = buyerSection.match(/Alamat\s*:\s*([\s\S]*?)\s*NPWP\s*:/i);
+    if (!match) return "";
+    // buang noise angka (mis. "#0841760184404000000000") yang suka nempel di ujung alamat
+    return this.cleanText(match[1]).replace(/#\d+$/, "").trim();
   }
 
   extractDasarPengenaanPajak(text) {
