@@ -161,10 +161,14 @@ class CoreTaxPdfExtractor {
     const amountPattern = /([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})/;
     const amountOnlyPattern = /^([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})$/;
 
-    // Pola baris item, contoh:
-    // 1 150202
-    // atau 1 150202 Jasa akuntansi...
-    const itemStartPattern = /^(\d+)\s+([A-Za-z0-9.\-\/]+)(?:\s+(.*))?$/;
+    // Baris item selalu berupa "No [kode]? nominal" persis (kode opsional,
+    // bisa kosong di faktur), sedangkan deskripsi barang selalu ada di baris
+    // lain (sebelum/sesudahnya) -- jangan cocokkan token alfanumerik apa pun
+    // sebagai kode, karena itu false-positive pada baris deskripsi yang
+    // kebetulan diawali angka (mis. "7 KAVLING D-HUB").
+    const itemStartPattern = new RegExp(
+      `^(\\d+)\\s+(?:([0-9]+)\\s+)?${amountPattern.source}$`
+    );
 
     const cleanedLines = lines.map((line) => this.cleanText(line)).filter(Boolean);
 
@@ -191,7 +195,7 @@ class CoreTaxPdfExtractor {
       /^(Harga\s+Jual\s*\/\s*Penggantian\s*\/\s*Uang\s+Muka\s*\/\s*Termin|Dikurangi\s+Potongan\s+Harga|Dikurangi\s+Uang\s+Muka|Dasar\s+Pengenaan\s+Pajak|Jumlah\s+PPN|Jumlah\s+PPnBM|Sesuai\s+dengan\s+ketentuan)/i.test(line);
 
     const isHeaderLine = (line) =>
-      /^(No\.?|Kode|Barang\/?|Jasa|Nama\s+Barang.*|Harga\s+Jual.*|Penggantian.*|Uang\s+Muka.*|Termin|\(Rp\))$/i.test(line);
+      /^(No\.?|Kode|Barang\/?|Jasa|Jasa\s*\(Rp\)|Nama\s+Barang.*|Harga\s+Jual.*|Penggantian.*|Uang\s+Muka.*|Termin|\(Rp\))$/i.test(line);
 
     const isUsableDescriptionLine = (line) => {
       if (!line) return false;
@@ -207,13 +211,9 @@ class CoreTaxPdfExtractor {
 
       if (!itemMatch) continue;
 
-      const itemNo = itemMatch[1];
-      const kodeBarang = itemMatch[2];
-      let tail = this.cleanText(itemMatch[3] || "");
+      const kodeBarang = itemMatch[2] || "";
+      const amount = this.parseRupiah(itemMatch[3]);
 
-      if (!/^\d+$/.test(itemNo) || !kodeBarang) continue;
-
-      let amount = null;
       const descriptionParts = [];
 
       // ==============================
@@ -248,25 +248,9 @@ class CoreTaxPdfExtractor {
       descriptionParts.push(...previousParts);
 
       // ==============================
-      // 2. Ambil deskripsi yang berada di baris yang sama dengan item
-      // Contoh: 1 150202 Jasa akuntansi...
-      // ==============================
-      if (tail) {
-        const tailAmountRegex = new RegExp(`(${amountPattern.source})\\s*$`);
-        const tailAmountMatch = tail.match(tailAmountRegex);
-
-        if (tailAmountMatch) {
-          amount = this.parseRupiah(tailAmountMatch[1]);
-          tail = this.cleanText(tail.replace(tailAmountRegex, ""));
-        }
-
-        if (isUsableDescriptionLine(tail) && tail !== kodeBarang) {
-          descriptionParts.push(tail);
-        }
-      }
-
-      // ==============================
-      // 3. Ambil deskripsi yang muncul SETELAH baris item
+      // 2. Ambil deskripsi yang muncul SETELAH baris item
+      // (nominal sudah didapat langsung dari baris item, jadi tidak ada sisa
+      // teks di baris item itu sendiri untuk diambil sebagai deskripsi)
       // ==============================
       let j = i + 1;
 
@@ -281,13 +265,8 @@ class CoreTaxPdfExtractor {
         // Kalau ketemu item berikutnya, stop
         if (nextItemMatch) break;
 
-        const amountOnlyMatch = next.match(amountOnlyPattern);
-
-        // Kalau cuma nominal sendiri, itu dianggap harga jual kolom kanan
-        if (amountOnlyMatch) {
-          if (amount === null) {
-            amount = this.parseRupiah(amountOnlyMatch[1]);
-          }
+        // Baris nominal berdiri sendiri menandai akhir blok deskripsi item ini
+        if (amountOnlyPattern.test(next)) {
           j += 1;
           break;
         }
