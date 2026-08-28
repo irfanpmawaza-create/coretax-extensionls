@@ -161,13 +161,17 @@ class CoreTaxPdfExtractor {
     const amountPattern = /([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})/;
     const amountOnlyPattern = /^([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})$/;
 
-    // Baris item selalu berupa "No [kode]? nominal" persis (kode opsional,
-    // bisa kosong di faktur), sedangkan deskripsi barang selalu ada di baris
-    // lain (sebelum/sesudahnya) -- jangan cocokkan token alfanumerik apa pun
-    // sebagai kode, karena itu false-positive pada baris deskripsi yang
-    // kebetulan diawali angka (mis. "7 KAVLING D-HUB").
+    // Baris item selalu diawali "No [kode]?" dan diakhiri nominal, dengan
+    // kode opsional (bisa kosong di faktur) -- jangan cocokkan token
+    // alfanumerik apa pun sebagai kode, karena itu false-positive pada baris
+    // deskripsi yang kebetulan diawali angka (mis. "7 KAVLING D-HUB").
+    // Di antara kode dan nominal boleh ada teks lain (mis. "Rp X x Y Lainnya")
+    // karena kadang baris rincian harga satuan ikut tergabung ke baris item
+    // ini saat deskripsi barang hanya 2 baris (lihat itemsToLines: baris
+    // dikelompokkan per koordinat Y, jadi tinggi baris item bisa bergeser
+    // naik dan menimpa baris rincian harga di atasnya).
     const itemStartPattern = new RegExp(
-      `^(\\d+)\\s+(?:([0-9]+)\\s+)?${amountPattern.source}$`
+      `^(\\d+)\\s+(?:([0-9]+)\\s+)?(?:.*\\s)?${amountPattern.source}$`
     );
 
     const cleanedLines = lines.map((line) => this.cleanText(line)).filter(Boolean);
