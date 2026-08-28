@@ -63,4 +63,4 @@ Wajib ada di folder `libs`:
 
 ## Dokumen Legal
 
-Syarat penggunaan dan kebijakan privasi extension ini ada di [SYARAT_DAN_KETENTUAN.md](SYARAT_DAN_KETENTUAN.md) dan [KEBIJAKAN_PRIVASI.md](KEBIJAKAN_PRIVASI.md).
+Syarat penggunaan dan kebijakan privasi extension ini ada di [SYARAT_DAN_KETENTUAN.md](SYARAT_DAN_KETENTUAN.md) dan [KEBIJAKAN_PRIVASI.md](KEBIJAKAN_PRIVASI.md). Baris "Terakhir diperbarui" di kedua file itu ter-update otomatis lewat git hook saat file tersebut ikut di-commit — jalankan `git config core.hooksPath .githooks` sekali setelah clone repo ini supaya hook-nya aktif.

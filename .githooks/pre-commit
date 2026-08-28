@@ -1,0 +1,30 @@
+#!/bin/sh
+# Update baris "Terakhir diperbarui" di dokumen legal saat file itu ikut di-commit.
+# ponytail: cuma nempel ke 2 file ini, bukan sistem tanggal umum -- tambah nama file
+# ke daftar di bawah kalau ada dokumen legal lain yang butuh perilaku sama.
+
+files="SYARAT_DAN_KETENTUAN.md KEBIJAKAN_PRIVASI.md"
+staged=$(git diff --cached --name-only)
+
+month_id() {
+  case "$1" in
+    01) echo Januari ;; 02) echo Februari ;; 03) echo Maret ;;
+    04) echo April ;;   05) echo Mei ;;      06) echo Juni ;;
+    07) echo Juli ;;    08) echo Agustus ;;  09) echo September ;;
+    10) echo Oktober ;; 11) echo November ;; 12) echo Desember ;;
+  esac
+}
+
+today="$(date +%d | sed 's/^0*//') $(month_id "$(date +%m)") $(date +%Y)"
+
+for f in $files; do
+  case "$staged" in
+    *"$f"*)
+      [ -f "$f" ] || continue
+      sed -i "s/^\*\*Terakhir diperbarui:\*\*.*/**Terakhir diperbarui:** $today/" "$f"
+      git add "$f"
+      ;;
+  esac
+done
+
+exit 0
