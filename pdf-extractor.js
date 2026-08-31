@@ -1,3 +1,9 @@
+const BULAN_ID = {
+  januari: 1, februari: 2, maret: 3, april: 4,
+  mei: 5, juni: 6, juli: 7, agustus: 8,
+  september: 9, oktober: 10, november: 11, desember: 12
+};
+
 class CoreTaxPdfExtractor {
   // mencari library pembaca pdf di folder libs
   constructor() {
@@ -23,6 +29,7 @@ class CoreTaxPdfExtractor {
 
     const fullText = allLines.join("\n");
     const kodeFaktur = this.extractKodeFaktur(fullText);
+    const tanggalFaktur = this.extractTanggalFaktur(fullText);
     const lawanTransaksi = this.extractLawanTransaksi(fullText);
     const npwpLawan = this.extractNpwpLawan(fullText);
     const alamatLawan = this.extractAlamatLawan(fullText);
@@ -36,6 +43,7 @@ class CoreTaxPdfExtractor {
       return [{
         "File": fileName,
         "Kode dan Nomor Seri Faktur Pajak": kodeFaktur,
+        "Tanggal Faktur": tanggalFaktur,
         "Nama Barang Kena Pajak / Jasa Kena Pajak": "",
         "Lawan Transaksi": lawanTransaksi,
         "NPWP Lawan Transaksi": npwpLawan,
@@ -51,6 +59,7 @@ class CoreTaxPdfExtractor {
     return itemRows.map((item) => ({
       "File": fileName,
       "Kode dan Nomor Seri Faktur Pajak": kodeFaktur,
+      "Tanggal Faktur": tanggalFaktur,
       "Nama Barang Kena Pajak / Jasa Kena Pajak": item.description,
       "Lawan Transaksi": lawanTransaksi,
       "NPWP Lawan Transaksi": npwpLawan,
@@ -103,6 +112,20 @@ class CoreTaxPdfExtractor {
     }
 
     return "";
+  }
+
+  //ekstrak tanggal faktur dari blok tanda tangan elektronik, format "06 Januari 2026 Ditandatangani secara elektronik"
+  extractTanggalFaktur(text) {
+    const normalizedText = String(text || "").replace(/\s+/g, " ");
+    const match = normalizedText.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s*Ditandatangani secara elektronik/i);
+    if (!match) return "";
+
+    const bulan = BULAN_ID[match[2].toLowerCase()];
+    if (!bulan) return "";
+
+    const dd = match[1].padStart(2, "0");
+    const mm = String(bulan).padStart(2, "0");
+    return `${dd}/${mm}/${match[3]}`;
   }
 
   //ekstrak pembeli (hasil excel - oke)
