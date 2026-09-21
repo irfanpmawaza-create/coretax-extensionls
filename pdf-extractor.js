@@ -42,32 +42,32 @@ class CoreTaxPdfExtractor {
     if (itemRows.length === 0) {
       return [{
         "File": fileName,
-        "Kode dan Nomor Seri Faktur Pajak": kodeFaktur,
+        "Nomor Faktur Pajak": kodeFaktur,
         "Tanggal Faktur": tanggalFaktur,
-        "Nama Barang Kena Pajak / Jasa Kena Pajak": "",
+        "Nama Barang/Jasa": "",
         "Lawan Transaksi": lawanTransaksi,
         "NPWP Lawan Transaksi": npwpLawan,
         "Alamat Lawan Transaksi": alamatLawan,
-        "Harga Jual / Penggantian /  Uang Muka / Termin": null,
+        "Harga Satuan": null,
         "Potongan Harga": potonganHarga,
-        "Dasar Pengenaan Pajak": dasarPengenaanPajak,
-        "Jumlah PPN (Pajak Pertambahan Nilai)": jumlahPpn,
+        "DPP": dasarPengenaanPajak,
+        "PPN": jumlahPpn,
         "Catatan": "Item tidak terbaca. Periksa struktur PDF."
       }];
     }
 
     return itemRows.map((item) => ({
       "File": fileName,
-      "Kode dan Nomor Seri Faktur Pajak": kodeFaktur,
+      "Nomor Faktur Pajak": kodeFaktur,
       "Tanggal Faktur": tanggalFaktur,
-      "Nama Barang Kena Pajak / Jasa Kena Pajak": item.description,
+      "Nama Barang/Jasa": item.description,
       "Lawan Transaksi": lawanTransaksi,
       "NPWP Lawan Transaksi": npwpLawan,
       "Alamat Lawan Transaksi": alamatLawan,
-      "Harga Jual / Penggantian /  Uang Muka / Termin": item.amount,
+      "Harga Satuan": item.amount,
       "Potongan Harga": potonganHarga,
-      "Dasar Pengenaan Pajak": dasarPengenaanPajak,
-      "Jumlah PPN (Pajak Pertambahan Nilai)": jumlahPpn,
+      "DPP": dasarPengenaanPajak,
+      "PPN": jumlahPpn,
       "Catatan": ""
     }));
   }

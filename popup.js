@@ -183,6 +183,7 @@ class PopupManager {
           "libs/xlsx.full.min.js",
           "pdf-extractor.js",
           "excel-exporter.js",
+          "invoice-detail-mapper.js",
           "content.js"
         ]
       }, () => {

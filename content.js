@@ -73,16 +73,18 @@
         const button = document.createElement("button");
         button.textContent = label;
         Object.assign(button.style, {
-          width: "100%",
-          padding: "10px 12px",
+          width: "169px",
+          height: "40px",
+          padding: "0",
+          alignSelf: "center",
           fontSize: "13px",
           fontWeight: "bold",
           cursor: "pointer",
           backgroundColor: bgColor,
           color: "#ffffff",
-          border: "0",
+          border: "1px solid transparent",
           borderRadius: "6px",
-          boxSizing: "border-box"
+          boxSizing: "content-box"
         });
         button.addEventListener("mouseenter", () => {
           if (!button.disabled) button.style.backgroundColor = hoverColor;
@@ -188,16 +190,18 @@
       const toggleBtn = document.createElement("button");
       toggleBtn.textContent = isWithholdingPage ? "Bukti Potong Multi Periode" : "Faktur Keluaran Multi Periode";
       Object.assign(toggleBtn.style, {
-        width: "100%",
-        padding: "10px 12px",
+        width: "169px",
+        height: "40px",
+        padding: "0",
+        alignSelf: "center",
         fontSize: "13px",
         fontWeight: "bold",
         cursor: "pointer",
         backgroundColor: "#1a73e8",
         color: "#ffffff",
-        border: "0",
+        border: "1px solid transparent",
         borderRadius: "6px",
-        boxSizing: "border-box"
+        boxSizing: "content-box"
       });
       toggleBtn.addEventListener("mouseenter", () => { toggleBtn.style.backgroundColor = "#1558b0"; });
       toggleBtn.addEventListener("mouseleave", () => { toggleBtn.style.backgroundColor = "#1a73e8"; });
@@ -281,22 +285,24 @@
       let buildItemExcelLabel = null;
       if (!isWithholdingPage) {
         ({ label: savePdfLabel, checkbox: savePdfCheckbox } = makeCheckboxLabel("Simpan PDF juga"));
-        ({ label: buildItemExcelLabel, checkbox: buildItemExcelCheckbox } = makeCheckboxLabel("Excel rincian per barang (dari PDF)"));
+        ({ label: buildItemExcelLabel, checkbox: buildItemExcelCheckbox } = makeCheckboxLabel("Excel rincian per barang"));
       }
 
       const processBtn = document.createElement("button");
       processBtn.textContent = "Proses Multi Periode";
       Object.assign(processBtn.style, {
-        width: "100%",
-        padding: "10px 12px",
+        width: "169px",
+        height: "40px",
+        padding: "0",
+        alignSelf: "center",
         fontSize: "13px",
         fontWeight: "bold",
         cursor: "pointer",
         backgroundColor: "#349e48",
         color: "#ffffff",
-        border: "0",
+        border: "1px solid transparent",
         borderRadius: "6px",
-        boxSizing: "border-box",
+        boxSizing: "content-box",
         marginTop: "4px"
       });
       processBtn.addEventListener("mouseenter", () => {
@@ -510,7 +516,7 @@
         "Tahun": item.TaxInvoiceYear || "",
         "Tanggal Faktur Pajak": this.formatApiDate(item.TaxInvoiceDate),
         "Nomor Faktur Pajak": item.TaxInvoiceNumber || "",
-        "Kode Faktur": item.TaxInvoiceCode || "",
+        "Kode Transaksi": item.TaxInvoiceCode || "",
         "NPWP Penjual": item.SellerTIN || "",
         "Nama Penjual": item.SellerTaxpayerName || "",
         "NPWP Pembeli": item.BuyerTIN || "",
@@ -534,6 +540,18 @@
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       return new Blob([bytes], { type: mimeType || "application/pdf" });
+    }
+
+    buildInvoicePdfFileName(item, invoiceType) {
+      const periodMonth = Number(String(item.TaxInvoicePeriod || "").slice(-2));
+      const monthAbbr = this.cleanFileName(this.getMonthName(periodMonth).slice(0, 3));
+      const counterpartyName = this.cleanFileName(
+        invoiceType === "input"
+          ? (item.SellerTaxpayerName || "")
+          : (item.BuyerTaxpayerNameClear || item.BuyerName || item.DisplayName || item.BuyerTaxpayerName || "")
+      );
+      const taxInvoiceNumber = this.cleanFileName(item.TaxInvoiceNumber || "FAKTUR");
+      return `${taxInvoiceNumber}_${counterpartyName}_${monthAbbr}${item.TaxInvoiceYear || ""}.pdf`;
     }
 
     async fetchInvoicePdfBlob(item, invoiceType) {
@@ -563,17 +581,47 @@
         blob = this.base64ToBlob(result.base64, result.contentType);
       }
 
-      const periodMonth = Number(String(item.TaxInvoicePeriod || "").slice(-2));
-      const monthAbbr = this.cleanFileName(this.getMonthName(periodMonth).slice(0, 3));
-      const counterpartyName = this.cleanFileName(
-        invoiceType === "input"
-          ? (item.SellerTaxpayerName || "")
-          : (item.BuyerTaxpayerNameClear || item.BuyerName || item.DisplayName || item.BuyerTaxpayerName || "")
-      );
-      const taxInvoiceNumber = this.cleanFileName(item.TaxInvoiceNumber || "FAKTUR");
-      const fileName = `${taxInvoiceNumber}_${counterpartyName}_${monthAbbr}${item.TaxInvoiceYear || ""}.pdf`;
+      return { blob, fileName: this.buildInvoicePdfFileName(item, invoiceType) };
+    }
 
-      return { blob, fileName };
+    async fetchOutputInvoiceDetail(item) {
+      const result = await this.sendMessageToBackground({
+        action: "fetchOutputInvoiceDetail",
+        recordIdentifier: item.RecordId || ""
+      });
+
+      if (!result?.success) {
+        throw new Error(result?.message || "Gagal mengambil detail Faktur Keluaran.");
+      }
+
+      return result.response?.Payload?.FormDataObj;
+    }
+
+    async fetchOutputInvoiceDetailsForItems(allInvoices) {
+      const failedDocuments = [];
+      const itemExcelRows = [];
+      let detailSuccessCount = 0;
+
+      // ponytail: serial tanpa jeda untuk menjaga beban CoreTax; tambah worker pool hanya jika benchmark membutuhkannya.
+      for (const item of allInvoices) {
+        try {
+          const formDataObj = await this.fetchOutputInvoiceDetail(item);
+          const rows = window.mapOutputInvoiceDetailRows(
+            item,
+            formDataObj,
+            this.buildInvoicePdfFileName(item, "output")
+          );
+          itemExcelRows.push(...rows);
+          detailSuccessCount++;
+        } catch (error) {
+          failedDocuments.push({
+            number: item.TaxInvoiceNumber || "?",
+            reason: `Detail API: ${error.message || String(error)}`
+          });
+        }
+      }
+
+      return { detailSuccessCount, failedDocuments, itemExcelRows };
     }
 
     async downloadInvoicePdfsForItems(allInvoices, invoiceType, { savePdf, buildItemExcel }) {
@@ -646,34 +694,49 @@
         ? `Faktur_Keluaran_${year}_${startLabel}.xlsx`
         : `Faktur_Keluaran_${year}_${startLabel}-${endLabel}.xlsx`;
 
-      let message = `Selesai. ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
-      let failedPdfs = [];
+      let message = `Selesai memproses ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}).`;
+      const failedDocuments = [];
+      let outputFileName = "";
 
-      if (options.savePdf || options.buildItemExcel) {
+      if (options.savePdf) {
         const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, "output", {
-          savePdf: options.savePdf,
-          buildItemExcel: options.buildItemExcel
+          savePdf: true,
+          buildItemExcel: false
         });
-        failedPdfs = pdfResult.failedPdfs;
-        if (options.savePdf) {
-          message += `\nPDF tersimpan: ${pdfResult.pdfSuccessCount}, PDF gagal: ${failedPdfs.length}.`;
-        }
-        if (options.buildItemExcel && pdfResult.itemExcelRows.length > 0) {
+        failedDocuments.push(...pdfResult.failedPdfs.map((item) => ({
+          ...item,
+          reason: `PDF: ${item.reason}`
+        })));
+        message += `\nPDF tersimpan: ${pdfResult.pdfSuccessCount}, PDF gagal: ${pdfResult.failedPdfs.length}.`;
+      }
+
+      if (options.buildItemExcel) {
+        const detailResult = await this.fetchOutputInvoiceDetailsForItems(allInvoices);
+        failedDocuments.push(...detailResult.failedDocuments);
+        message += `\nDetail API berhasil: ${detailResult.detailSuccessCount} faktur, ${detailResult.itemExcelRows.length} baris; gagal: ${detailResult.failedDocuments.length}.`;
+
+        if (detailResult.itemExcelRows.length > 0) {
           const itemFileName = startMonth === endMonth
             ? `Faktur_Keluaran_Rincian_${year}_${startLabel}.xlsx`
             : `Faktur_Keluaran_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
-          this.excelExporter.export(pdfResult.itemExcelRows, itemFileName);
-          message += `\nExcel rincian per barang: ${pdfResult.itemExcelRows.length} baris (${itemFileName}).`;
+          const excelRows = detailResult.itemExcelRows.map(({ File, ...row }) => row);
+          this.excelExporter.export(excelRows, itemFileName);
+          outputFileName = itemFileName;
+          message += `\nExcel rincian per barang: ${itemFileName}.`;
+        } else {
+          message += `\nExcel rincian tidak dibuat karena tidak ada detail yang berhasil diambil.`;
         }
       }
 
       if (!options.savePdf && !options.buildItemExcel) {
         const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
         this.excelExporter.export(excelRows, fileName, "output");
+        outputFileName = fileName;
+        message += `\nExcel ringkasan: ${fileName}.`;
       }
 
-      this.showFinalNotification(message, failedPdfs);
-      return { success: true, message, count: allInvoices.length, fileName };
+      this.showFinalNotification(message, failedDocuments);
+      return { success: true, message, count: allInvoices.length, fileName: outputFileName };
     }
 
     async fetchInputInvoicePage({ periodCode, year, first, rows }) {
@@ -779,7 +842,8 @@
           const itemFileName = startMonth === endMonth
             ? `Faktur_Masukan_Rincian_${year}_${startLabel}.xlsx`
             : `Faktur_Masukan_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
-          this.excelExporter.export(pdfResult.itemExcelRows, itemFileName);
+          const excelRows = pdfResult.itemExcelRows.map(({ File, ...row }) => row);
+          this.excelExporter.export(excelRows, itemFileName);
           message += `\nExcel rincian per barang: ${pdfResult.itemExcelRows.length} baris (${itemFileName}).`;
         }
       }
