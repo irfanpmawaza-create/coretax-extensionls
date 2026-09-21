@@ -73,18 +73,21 @@
         const button = document.createElement("button");
         button.textContent = label;
         Object.assign(button.style, {
-          width: "169px",
-          height: "40px",
-          padding: "0",
+          width: "169.236px",
+          minHeight: "40px",
+          height: "auto",
+          padding: "12px 16px",
           alignSelf: "center",
-          fontSize: "13px",
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+          fontSize: "1rem",
+          lineHeight: "16px",
           fontWeight: "bold",
           cursor: "pointer",
           backgroundColor: bgColor,
           color: "#ffffff",
-          border: "1px solid transparent",
+          border: "0",
           borderRadius: "6px",
-          boxSizing: "content-box"
+          boxSizing: "border-box"
         });
         button.addEventListener("mouseenter", () => {
           if (!button.disabled) button.style.backgroundColor = hoverColor;
@@ -96,9 +99,9 @@
         return button;
       };
 
-      const excelBtn = makeButton("Buat Excel Saja", "#349e48", "#2a7d3a", "excelOnly");
-      const pdfBtn = makeButton("Buat Pdf Saja", "#d00000", "#b00000", "pdfOnly");
-      const bothBtn = makeButton("Download PDF + Buat Excel", "#d00000", "#b00000", "downloadPdfAndExcel");
+      const excelBtn = makeButton("Buat Excel", "#349e48", "#2a7d3a", "excelOnly");
+      const pdfBtn = makeButton("Buat PDF", "#d00000", "#b00000", "pdfOnly");
+      const bothBtn = makeButton("Buat PDF + Excel", "#d00000", "#b00000", "downloadPdfAndExcel");
 
       this.toolbarButtons = [excelBtn, pdfBtn, bothBtn];
       body.appendChild(excelBtn);
@@ -188,20 +191,23 @@
       const isWithholdingPage = window.location.pathname.includes("/withholding-slips-portal/");
 
       const toggleBtn = document.createElement("button");
-      toggleBtn.textContent = isWithholdingPage ? "Bukti Potong Multi Periode" : "Faktur Keluaran Multi Periode";
+      toggleBtn.textContent = "Custom Download ▼";
       Object.assign(toggleBtn.style, {
-        width: "169px",
-        height: "40px",
-        padding: "0",
+        width: "169.236px",
+        minHeight: "40px",
+        height: "auto",
+        padding: "12px 16px",
         alignSelf: "center",
-        fontSize: "13px",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+        fontSize: "1rem",
+        lineHeight: "16px",
         fontWeight: "bold",
         cursor: "pointer",
         backgroundColor: "#1a73e8",
         color: "#ffffff",
-        border: "1px solid transparent",
+        border: "0",
         borderRadius: "6px",
-        boxSizing: "content-box"
+        boxSizing: "border-box"
       });
       toggleBtn.addEventListener("mouseenter", () => { toggleBtn.style.backgroundColor = "#1558b0"; });
       toggleBtn.addEventListener("mouseleave", () => { toggleBtn.style.backgroundColor = "#1a73e8"; });
@@ -291,18 +297,21 @@
       const processBtn = document.createElement("button");
       processBtn.textContent = "Proses Multi Periode";
       Object.assign(processBtn.style, {
-        width: "169px",
-        height: "40px",
-        padding: "0",
+        width: "169.236px",
+        minHeight: "40px",
+        height: "auto",
+        padding: "12px 16px",
         alignSelf: "center",
-        fontSize: "13px",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+        fontSize: "1rem",
+        lineHeight: "16px",
         fontWeight: "bold",
         cursor: "pointer",
         backgroundColor: "#349e48",
         color: "#ffffff",
-        border: "1px solid transparent",
+        border: "0",
         borderRadius: "6px",
-        boxSizing: "content-box",
+        boxSizing: "border-box",
         marginTop: "4px"
       });
       processBtn.addEventListener("mouseenter", () => {
