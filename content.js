@@ -21,18 +21,7 @@
 
       const toolbar = document.createElement("div");
       toolbar.id = "coretax-extension-toolbar";
-      Object.assign(toolbar.style, {
-        position: "fixed",
-        top: "90px",
-        right: "16px",
-        zIndex: "2147483000",
-        backgroundColor: "#f2f2f2",
-        boxShadow: "0 6px 20px rgba(0, 0, 0, 0.25)",
-        fontFamily: '"Segoe UI", Arial, sans-serif',
-        width: "220px",
-        boxSizing: "border-box",
-        overflow: "hidden"
-      });
+      this.toolbar = toolbar;
 
       const savedPosition = this.loadToolbarPosition();
       if (savedPosition) {
@@ -42,66 +31,34 @@
       }
 
       const header = document.createElement("div");
-      Object.assign(header.style, {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "8px 12px",
-        backgroundColor: "#d00000",
-        color: "#ffffff",
-        fontSize: "13px",
-        fontWeight: "600",
-        cursor: "move",
-        userSelect: "none"
-      });
+      header.className = "coretax-toolbar__header";
+      header.tabIndex = 0;
+      header.setAttribute("role", "button");
+      header.setAttribute("aria-expanded", "true");
       header.textContent = "CoreTax Extension";
       this.makeToolbarDraggable(toolbar, header);
 
       const toggleIcon = document.createElement("span");
+      toggleIcon.className = "coretax-toolbar__chevron coretax-toolbar__header-chevron";
+      toggleIcon.setAttribute("aria-hidden", "true");
       toggleIcon.textContent = "▾";
       header.appendChild(toggleIcon);
 
       const body = document.createElement("div");
-      Object.assign(body.style, {
-        padding: "10px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px"
-      });
+      body.className = "coretax-toolbar__body";
 
-      const makeButton = (label, bgColor, hoverColor, mode) => {
+      const makeButton = (label, mode, variant) => {
         const button = document.createElement("button");
+        button.type = "button";
+        button.className = `coretax-toolbar__button coretax-toolbar__button--${variant}`;
         button.textContent = label;
-        Object.assign(button.style, {
-          width: "169.236px",
-          minHeight: "40px",
-          height: "auto",
-          padding: "12px 16px",
-          alignSelf: "center",
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
-          fontSize: "1rem",
-          lineHeight: "16px",
-          fontWeight: "bold",
-          cursor: "pointer",
-          backgroundColor: bgColor,
-          color: "#ffffff",
-          border: "0",
-          borderRadius: "6px",
-          boxSizing: "border-box"
-        });
-        button.addEventListener("mouseenter", () => {
-          if (!button.disabled) button.style.backgroundColor = hoverColor;
-        });
-        button.addEventListener("mouseleave", () => {
-          if (!button.disabled) button.style.backgroundColor = bgColor;
-        });
         button.addEventListener("click", () => this.handleToolbarClick(button, mode, label));
         return button;
       };
 
-      const excelBtn = makeButton("Buat Excel", "#349e48", "#2a7d3a", "excelOnly");
-      const pdfBtn = makeButton("Buat PDF", "#d00000", "#b00000", "pdfOnly");
-      const bothBtn = makeButton("Buat PDF + Excel", "#d00000", "#b00000", "downloadPdfAndExcel");
+      const excelBtn = makeButton("Buat Excel", "excelOnly", "excel");
+      const pdfBtn = makeButton("Buat PDF", "pdfOnly", "pdf");
+      const bothBtn = makeButton("Buat PDF + Excel", "downloadPdfAndExcel", "both");
 
       this.toolbarButtons = [excelBtn, pdfBtn, bothBtn];
       body.appendChild(excelBtn);
@@ -109,17 +66,41 @@
       body.appendChild(bothBtn);
       body.appendChild(this.buildMultiPeriodSection());
 
-      let collapsed = false;
-      header.addEventListener("click", () => {
+      const status = document.createElement("p");
+      status.className = "coretax-toolbar__status";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      status.hidden = true;
+      this.toolbarStatus = status;
+      body.appendChild(status);
+
+      const toggleToolbar = () => {
         if (toolbar.dataset.dragged === "true") return;
-        collapsed = !collapsed;
-        body.style.display = collapsed ? "none" : "flex";
-        toggleIcon.textContent = collapsed ? "▸" : "▾";
+        const collapsed = toolbar.classList.toggle("is-collapsed");
+        header.setAttribute("aria-expanded", String(!collapsed));
+        requestAnimationFrame(() => this.keepToolbarInViewport(toolbar));
+      };
+      header.addEventListener("click", toggleToolbar);
+      header.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        toggleToolbar();
       });
 
       toolbar.appendChild(header);
       toolbar.appendChild(body);
       document.body.appendChild(toolbar);
+      this.keepToolbarInViewport(toolbar);
+      window.addEventListener("resize", () => this.keepToolbarInViewport(toolbar));
+    }
+
+    keepToolbarInViewport(toolbar) {
+      const rect = toolbar.getBoundingClientRect();
+      const maxLeft = Math.max(0, window.innerWidth - toolbar.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - toolbar.offsetHeight);
+      toolbar.style.left = `${Math.min(Math.max(rect.left, 0), maxLeft)}px`;
+      toolbar.style.top = `${Math.min(Math.max(rect.top, 0), maxTop)}px`;
+      toolbar.style.right = "auto";
     }
 
     makeToolbarDraggable(toolbar, handle) {
@@ -180,58 +161,38 @@
 
     buildMultiPeriodSection() {
       const section = document.createElement("div");
-      Object.assign(section.style, {
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px",
-        borderTop: "1px solid #ddd",
-        paddingTop: "8px"
-      });
+      section.className = "coretax-toolbar__section";
 
       const isWithholdingPage = window.location.pathname.includes("/withholding-slips-portal/");
 
       const toggleBtn = document.createElement("button");
-      toggleBtn.textContent = "Custom Download ▼";
-      Object.assign(toggleBtn.style, {
-        width: "169.236px",
-        minHeight: "40px",
-        height: "auto",
-        padding: "12px 16px",
-        alignSelf: "center",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
-        fontSize: "1rem",
-        lineHeight: "16px",
-        fontWeight: "bold",
-        cursor: "pointer",
-        backgroundColor: "#1a73e8",
-        color: "#ffffff",
-        border: "0",
-        borderRadius: "6px",
-        boxSizing: "border-box"
-      });
-      toggleBtn.addEventListener("mouseenter", () => { toggleBtn.style.backgroundColor = "#1558b0"; });
-      toggleBtn.addEventListener("mouseleave", () => { toggleBtn.style.backgroundColor = "#1a73e8"; });
+      toggleBtn.type = "button";
+      toggleBtn.className = "coretax-toolbar__button coretax-toolbar__button--custom";
+      toggleBtn.setAttribute("aria-expanded", "false");
+      toggleBtn.setAttribute("aria-controls", "coretax-custom-download-form");
+      const toggleText = document.createElement("span");
+      toggleText.textContent = "Custom Download";
+      const toggleChevron = document.createElement("span");
+      toggleChevron.className = "coretax-toolbar__chevron";
+      toggleChevron.setAttribute("aria-hidden", "true");
+      toggleChevron.textContent = "▼";
+      toggleBtn.appendChild(toggleText);
+      toggleBtn.appendChild(toggleChevron);
 
       const panel = document.createElement("div");
-      Object.assign(panel.style, { display: "none", flexDirection: "column", gap: "6px" });
-
-      const fieldStyle = {
-        width: "100%",
-        padding: "6px 8px",
-        fontSize: "12px",
-        boxSizing: "border-box",
-        border: "1px solid #ccc",
-        borderRadius: "4px"
-      };
-      const labelStyle = { fontSize: "11px", color: "#333" };
+      panel.id = "coretax-custom-download-form";
+      panel.className = "coretax-toolbar__form";
+      panel.hidden = true;
 
       let typeSelect = null;
       if (!isWithholdingPage) {
         const typeLabel = document.createElement("label");
+        typeLabel.className = "coretax-toolbar__label";
+        typeLabel.htmlFor = "coretax-invoice-type";
         typeLabel.textContent = "Jenis Faktur";
-        Object.assign(typeLabel.style, labelStyle);
         typeSelect = document.createElement("select");
-        Object.assign(typeSelect.style, fieldStyle);
+        typeSelect.id = "coretax-invoice-type";
+        typeSelect.className = "coretax-toolbar__field";
         [["output", "Faktur Keluaran"], ["input", "Faktur Masukan"]].forEach(([value, label]) => {
           const option = document.createElement("option");
           option.value = value;
@@ -243,18 +204,21 @@
       }
 
       const yearLabel = document.createElement("label");
+      yearLabel.className = "coretax-toolbar__label";
+      yearLabel.htmlFor = "coretax-download-year";
       yearLabel.textContent = "Tahun";
-      Object.assign(yearLabel.style, labelStyle);
       const yearInput = document.createElement("input");
+      yearInput.id = "coretax-download-year";
+      yearInput.className = "coretax-toolbar__field";
       yearInput.type = "number";
       yearInput.min = "2020";
       yearInput.max = "2100";
       yearInput.value = String(new Date().getFullYear());
-      Object.assign(yearInput.style, fieldStyle);
 
-      const makeMonthSelect = (defaultMonth) => {
+      const makeMonthSelect = (id, defaultMonth) => {
         const select = document.createElement("select");
-        Object.assign(select.style, fieldStyle);
+        select.id = id;
+        select.className = "coretax-toolbar__field";
         for (let month = 1; month <= 12; month++) {
           const option = document.createElement("option");
           option.value = String(month);
@@ -266,19 +230,23 @@
       };
 
       const startLabel = document.createElement("label");
+      startLabel.className = "coretax-toolbar__label";
+      startLabel.htmlFor = "coretax-start-month";
       startLabel.textContent = "Dari Bulan";
-      Object.assign(startLabel.style, labelStyle);
-      const startMonthSelect = makeMonthSelect(1);
+      const startMonthSelect = makeMonthSelect("coretax-start-month", 1);
 
       const endLabel = document.createElement("label");
+      endLabel.className = "coretax-toolbar__label";
+      endLabel.htmlFor = "coretax-end-month";
       endLabel.textContent = "Sampai Bulan";
-      Object.assign(endLabel.style, labelStyle);
-      const endMonthSelect = makeMonthSelect(2);
+      const endMonthSelect = makeMonthSelect("coretax-end-month", 2);
 
-      const makeCheckboxLabel = (text) => {
+      const makeCheckboxLabel = (id, text) => {
         const label = document.createElement("label");
-        Object.assign(label.style, { ...labelStyle, display: "flex", alignItems: "center", gap: "6px" });
+        label.className = "coretax-toolbar__check";
+        label.htmlFor = id;
         const checkbox = document.createElement("input");
+        checkbox.id = id;
         checkbox.type = "checkbox";
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(text));
@@ -290,42 +258,23 @@
       let buildItemExcelCheckbox = null;
       let buildItemExcelLabel = null;
       if (!isWithholdingPage) {
-        ({ label: savePdfLabel, checkbox: savePdfCheckbox } = makeCheckboxLabel("Simpan PDF juga"));
-        ({ label: buildItemExcelLabel, checkbox: buildItemExcelCheckbox } = makeCheckboxLabel("Excel rincian per barang"));
+        ({ label: savePdfLabel, checkbox: savePdfCheckbox } = makeCheckboxLabel("coretax-save-pdf", "Simpan PDF juga"));
+        ({ label: buildItemExcelLabel, checkbox: buildItemExcelCheckbox } = makeCheckboxLabel("coretax-item-excel", "Excel rincian per barang"));
       }
 
       const processBtn = document.createElement("button");
+      processBtn.type = "button";
+      processBtn.className = "coretax-toolbar__button coretax-toolbar__button--process";
       processBtn.textContent = "Proses Multi Periode";
-      Object.assign(processBtn.style, {
-        width: "169.236px",
-        minHeight: "40px",
-        height: "auto",
-        padding: "12px 16px",
-        alignSelf: "center",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
-        fontSize: "1rem",
-        lineHeight: "16px",
-        fontWeight: "bold",
-        cursor: "pointer",
-        backgroundColor: "#349e48",
-        color: "#ffffff",
-        border: "0",
-        borderRadius: "6px",
-        boxSizing: "border-box",
-        marginTop: "4px"
-      });
-      processBtn.addEventListener("mouseenter", () => {
-        if (!processBtn.disabled) processBtn.style.backgroundColor = "#2a7d3a";
-      });
-      processBtn.addEventListener("mouseleave", () => {
-        if (!processBtn.disabled) processBtn.style.backgroundColor = "#349e48";
-      });
       processBtn.addEventListener("click", () => {
         this.handleMultiPeriodToolbarClick(processBtn, yearInput, startMonthSelect, endMonthSelect, typeSelect, savePdfCheckbox, buildItemExcelCheckbox);
       });
 
       toggleBtn.addEventListener("click", () => {
-        panel.style.display = panel.style.display === "none" ? "flex" : "none";
+        const expanded = toggleBtn.getAttribute("aria-expanded") === "true";
+        toggleBtn.setAttribute("aria-expanded", String(!expanded));
+        panel.hidden = expanded;
+        requestAnimationFrame(() => this.keepToolbarInViewport(this.toolbar));
       });
 
       panel.appendChild(yearLabel);
@@ -344,26 +293,46 @@
     }
 
     async handleMultiPeriodToolbarClick(button, yearInput, startMonthSelect, endMonthSelect, typeSelect, savePdfCheckbox, buildItemExcelCheckbox) {
+      const year = Number(yearInput.value);
+      const startMonth = Number(startMonthSelect.value);
+      const endMonth = Number(endMonthSelect.value);
+      yearInput.removeAttribute("aria-invalid");
+      startMonthSelect.removeAttribute("aria-invalid");
+      endMonthSelect.removeAttribute("aria-invalid");
+
+      if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+        yearInput.setAttribute("aria-invalid", "true");
+        this.setToolbarStatus("Tahun harus diisi antara 2020 dan 2100.", "error");
+        yearInput.focus();
+        return;
+      }
+      if (!Number.isInteger(startMonth) || !Number.isInteger(endMonth) || startMonth < 1 || endMonth > 12 || startMonth > endMonth) {
+        startMonthSelect.setAttribute("aria-invalid", "true");
+        endMonthSelect.setAttribute("aria-invalid", "true");
+        this.setToolbarStatus("Bulan awal tidak boleh melewati bulan akhir.", "error");
+        startMonthSelect.focus();
+        return;
+      }
+
       button.disabled = true;
-      button.style.cursor = "not-allowed";
       const originalLabel = button.textContent;
       button.textContent = "Memproses...";
+      this.setToolbarStatus("Memproses custom download...", "loading");
 
       try {
         await this.downloadMultiPeriodInvoices({
-          year: Number(yearInput.value),
-          startMonth: Number(startMonthSelect.value),
-          endMonth: Number(endMonthSelect.value),
+          year,
+          startMonth,
+          endMonth,
           invoiceType: typeSelect?.value || "output",
           savePdf: Boolean(savePdfCheckbox?.checked),
           buildItemExcel: Boolean(buildItemExcelCheckbox?.checked)
         });
       } catch (error) {
         console.error("KESALAHAN MULTI PERIODE:", error);
-        alert(`Gagal: ${error.message || error}`);
+        this.setToolbarStatus(`Gagal: ${error.message || error}`, "error");
       } finally {
         button.disabled = false;
-        button.style.cursor = "pointer";
         button.textContent = originalLabel;
       }
     }
@@ -371,19 +340,32 @@
     async handleToolbarClick(button, mode, originalLabel) {
       this.toolbarButtons.forEach((btn) => {
         btn.disabled = true;
-        btn.style.cursor = "not-allowed";
       });
       button.textContent = "Memproses...";
+      this.setToolbarStatus("Memproses dokumen yang dipilih...", "loading");
 
       try {
-        await this.startProcess({ mode });
+        const result = await this.startProcess({ mode });
+        if (result?.success === false) this.setToolbarStatus(result.message, "error");
+      } catch (error) {
+        console.error("KESALAHAN PROSES:", error);
+        this.setToolbarStatus(`Gagal: ${error.message || error}`, "error");
       } finally {
         this.toolbarButtons.forEach((btn) => {
           btn.disabled = false;
-          btn.style.cursor = "pointer";
         });
         button.textContent = originalLabel;
       }
+    }
+
+    setToolbarStatus(message, state = "") {
+      if (!this.toolbarStatus) return;
+      this.toolbarStatus.textContent = message || "";
+      this.toolbarStatus.hidden = !message;
+      this.toolbarStatus.classList.toggle("is-loading", state === "loading");
+      this.toolbarStatus.classList.toggle("is-success", state === "success");
+      this.toolbarStatus.classList.toggle("is-error", state === "error");
+      if (message) requestAnimationFrame(() => this.keepToolbarInViewport(this.toolbar));
     }
 
     initializeMessageListener() {
@@ -1369,79 +1351,53 @@
       });
     }
 
-    showPopupMessage(message) {
+    showPopupMessage(message, type = "error") {
       const existingPopup = document.getElementById("coretax-downloader-popup");
       if (existingPopup) existingPopup.remove();
 
-      const popup = document.createElement("div");
-      popup.id = "coretax-downloader-popup";
-      popup.style.position = "fixed";
-      popup.style.top = "50%";
-      popup.style.left = "50%";
-      popup.style.transform = "translate(-50%, -50%)";
-      popup.style.backgroundColor = "#f2f2f2";
-      popup.style.borderRadius = "0";
-      popup.style.setProperty("border-radius", "0", "important");
-      popup.style.overflow = "hidden";
-      popup.style.boxShadow = "0 10px 28px rgba(0, 0, 0, 0.22)";
-      popup.style.zIndex = "2147483647";
-      popup.style.textAlign = "center";
-      popup.style.width = "min(560px, calc(100vw - 48px))";
-      popup.style.boxSizing = "border-box";
-      popup.style.fontFamily = '"Segoe UI", Arial, sans-serif';
+      const previousFocus = document.activeElement;
+      const overlay = document.createElement("div");
+      overlay.id = "coretax-downloader-popup";
+      overlay.className = "coretax-result-overlay";
 
-      const messageArea = document.createElement("div");
-      messageArea.style.boxSizing = "border-box";
-      messageArea.style.minHeight = "150px";
-      messageArea.style.padding = "40px 36px";
-      messageArea.style.display = "flex";
-      messageArea.style.alignItems = "center";
-      messageArea.style.justifyContent = "center";
+      const dialog = document.createElement("div");
+      dialog.className = `coretax-result-dialog is-${type}`;
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      dialog.setAttribute("aria-labelledby", "coretax-result-title");
+
+      const title = document.createElement("div");
+      title.id = "coretax-result-title";
+      title.className = "coretax-result-dialog__header";
+      title.textContent = type === "success" ? "Proses Berhasil" : type === "warning" ? "Proses Selesai dengan Catatan" : "Perhatian";
 
       const text = document.createElement("p");
+      text.className = "coretax-result-dialog__message";
       text.textContent = message;
-      text.style.color = "#111111";
-      text.style.fontSize = "24px";
-      text.style.lineHeight = "1.35";
-      text.style.fontWeight = "400";
-      text.style.letterSpacing = "0";
-      text.style.margin = "0";
 
       const closeButton = document.createElement("button");
+      closeButton.type = "button";
+      closeButton.className = "coretax-result-dialog__close";
       closeButton.textContent = "Tutup";
-      closeButton.style.width = "100%";
-      closeButton.style.height = "72px";
-      closeButton.style.padding = "0 24px";
-      closeButton.style.display = "block";
-      closeButton.style.cursor = "pointer";
-      closeButton.style.backgroundColor = "#f00000";
-      closeButton.style.color = "#ffffff";
-      closeButton.style.border = "0";
-      closeButton.style.borderTop = "1px solid rgba(0, 0, 0, 0.08)";
-      closeButton.style.borderRadius = "0";
-      closeButton.style.setProperty("border-radius", "0", "important");
-      closeButton.style.fontFamily = "inherit";
-      closeButton.style.fontSize = "24px";
-      closeButton.style.fontWeight = "500";
-      closeButton.style.letterSpacing = "0";
-      closeButton.addEventListener("mouseenter", () => {
-        closeButton.style.backgroundColor = "#c90000";
-      });
-      closeButton.addEventListener("mouseleave", () => {
-        closeButton.style.backgroundColor = "#f00000";
-      });
-      closeButton.addEventListener("focus", () => {
-        closeButton.style.backgroundColor = "#c90000";
-      });
-      closeButton.addEventListener("blur", () => {
-        closeButton.style.backgroundColor = "#f00000";
-      });
-      closeButton.addEventListener("click", () => popup.remove());
 
-      messageArea.appendChild(text);
-      popup.appendChild(messageArea);
-      popup.appendChild(closeButton);
-      document.body.appendChild(popup);
+      const close = () => {
+        overlay.remove();
+        if (previousFocus instanceof HTMLElement) previousFocus.focus();
+      };
+      closeButton.addEventListener("click", close);
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) close();
+      });
+      overlay.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") close();
+      });
+
+      dialog.appendChild(title);
+      dialog.appendChild(text);
+      dialog.appendChild(closeButton);
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      closeButton.focus();
     }
 
     showFinalNotification(message, failedDocuments) {
@@ -1449,7 +1405,8 @@
         const failedText = failedDocuments.map((item) => `${item.number}: ${item.reason}`).join("\n");
         message += `\n\nDetail gagal:\n${failedText}`;
       }
-      alert(message);
+      this.setToolbarStatus("");
+      this.showPopupMessage(message, failedDocuments.length > 0 ? "warning" : "success");
       console.log(message);
     }
 

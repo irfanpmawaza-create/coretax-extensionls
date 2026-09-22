@@ -27,6 +27,9 @@
         "https://coretaxdjp.pajak.go.id/e-invoice-portal/*",
         "https://coretaxdjp.pajak.go.id/withholding-slips-portal/*"
       ],
+      "css": [
+        "toolbar.css"
+      ],
       "js": [
         "libs/pdf.min.js",
         "libs/xlsx.full.min.js",

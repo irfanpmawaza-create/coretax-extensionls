@@ -1,0 +1,303 @@
+#coretax-extension-toolbar,
+#coretax-extension-toolbar * {
+  box-sizing: border-box;
+}
+
+#coretax-extension-toolbar {
+  position: fixed;
+  top: 90px;
+  right: 16px;
+  z-index: 2147483000;
+  display: flex;
+  width: min(220px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  flex-direction: column;
+  overflow: hidden;
+  background: #f2f2f2;
+  color: #333;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  text-align: left;
+}
+
+.coretax-toolbar__header {
+  display: flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #d00000;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: move;
+  user-select: none;
+}
+
+.coretax-toolbar__header:focus-visible,
+.coretax-toolbar__button:focus-visible,
+.coretax-toolbar__field:focus-visible,
+.coretax-toolbar__check input:focus-visible {
+  outline: 3px solid #ffc91b;
+  outline-offset: -3px;
+}
+
+.coretax-toolbar__chevron {
+  flex: 0 0 auto;
+  transition: transform 0.15s ease;
+}
+
+#coretax-extension-toolbar.is-collapsed .coretax-toolbar__header-chevron {
+  transform: rotate(-90deg);
+}
+
+.coretax-toolbar__body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+#coretax-extension-toolbar.is-collapsed .coretax-toolbar__body,
+#coretax-extension-toolbar [hidden] {
+  display: none !important;
+}
+
+.coretax-toolbar__button {
+  width: 100%;
+  min-height: 40px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.coretax-toolbar__button--excel,
+.coretax-toolbar__button--process {
+  background: #349e48;
+}
+
+.coretax-toolbar__button--excel:hover:not(:disabled),
+.coretax-toolbar__button--process:hover:not(:disabled) {
+  background: #2a7d3a;
+}
+
+.coretax-toolbar__button--pdf,
+.coretax-toolbar__button--both {
+  background: #d00000;
+}
+
+.coretax-toolbar__button--pdf:hover:not(:disabled),
+.coretax-toolbar__button--both:hover:not(:disabled) {
+  background: #b00000;
+}
+
+.coretax-toolbar__button--custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1a73e8;
+}
+
+.coretax-toolbar__button--custom:hover:not(:disabled) {
+  background: #1558b0;
+}
+
+.coretax-toolbar__button--custom[aria-expanded="true"] .coretax-toolbar__chevron {
+  transform: rotate(180deg);
+}
+
+.coretax-toolbar__button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.coretax-toolbar__section,
+.coretax-toolbar__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.coretax-toolbar__section {
+  padding-top: 8px;
+  border-top: 1px solid #ddd;
+}
+
+.coretax-toolbar__label {
+  color: #333;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.coretax-toolbar__field {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  font: inherit;
+  font-size: 12px;
+}
+
+.coretax-toolbar__field[aria-invalid="true"] {
+  border-color: #d00000;
+}
+
+.coretax-toolbar__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #333;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.coretax-toolbar__check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.coretax-toolbar__button--process {
+  margin-top: 4px;
+}
+
+.coretax-toolbar__status {
+  max-height: 120px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border: 1px solid #b9c1cb;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.coretax-toolbar__status.is-loading {
+  border-color: #1a73e8;
+  background: #eef5ff;
+}
+
+.coretax-toolbar__status.is-success {
+  border-color: #349e48;
+  background: #eef9f1;
+  color: #176c2f;
+}
+
+.coretax-toolbar__status.is-error {
+  border-color: #d00000;
+  background: #fdeeee;
+  color: #8f0000;
+}
+
+.coretax-result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.coretax-result-dialog {
+  display: flex;
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid #349e48;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+  color: #263238;
+  text-align: left;
+  animation: coretax-result-blink 0.65s ease-in-out 3;
+}
+
+.coretax-result-dialog.is-warning,
+.coretax-result-dialog.is-error {
+  border-color: #d00000;
+}
+
+.coretax-result-dialog__header {
+  padding: 16px 20px;
+  background: #349e48;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.coretax-result-dialog.is-warning .coretax-result-dialog__header,
+.coretax-result-dialog.is-error .coretax-result-dialog__header {
+  background: #d00000;
+}
+
+.coretax-result-dialog__message {
+  margin: 0;
+  padding: 20px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.coretax-result-dialog__close {
+  min-height: 48px;
+  margin: 0 20px 20px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #212c5f;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.coretax-result-dialog__close:hover,
+.coretax-result-dialog__close:focus-visible {
+  background: #161d3f;
+}
+
+@keyframes coretax-result-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.015);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #coretax-extension-toolbar * {
+    transition: none !important;
+  }
+
+  .coretax-result-dialog {
+    animation: none;
+  }
+}

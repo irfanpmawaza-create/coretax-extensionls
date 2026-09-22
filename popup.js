@@ -176,6 +176,19 @@ class PopupManager {
     if (isAlreadyInjected) return;
 
     await new Promise((resolve, reject) => {
+      chrome.scripting.insertCSS({
+        target: { tabId },
+        files: ["toolbar.css"]
+      }, () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve();
+      });
+    });
+
+    await new Promise((resolve, reject) => {
       chrome.scripting.executeScript({
         target: { tabId },
         files: [
