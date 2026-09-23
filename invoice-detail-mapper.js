@@ -72,7 +72,7 @@
       "Nomor Dokumen": cleanText(buyerData.IDDocumentNumber),
       "Alamat Lawan Transaksi": cleanText(buyerData.BuyerTaxpayerAddress),
       "Email": cleanText(buyerData.BuyerTaxpayerEmail),
-      "Harga Satuan": roundMoney(row?.TotalPrice),
+      "Harga Satuan": roundMoney(row?.UnitPrice),
       "Jumlah Barang Jasa": roundToTwoDecimals(row?.Quantity),
       "Potongan Harga": roundMoney(row?.Discount),
       "DPP": roundMoney(row?.TaxBase),

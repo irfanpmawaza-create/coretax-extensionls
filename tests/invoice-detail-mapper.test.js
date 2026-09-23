@@ -28,6 +28,7 @@ const formDataObj = {
       Code: "150202",
       Name: "Jasa akuntansi dan pembukuan",
       Quantity: 1,
+      UnitPrice: 8500000,
       TotalPrice: 8500000,
       Discount: 0,
       TaxBase: 8500000,
@@ -69,7 +70,7 @@ const twoRows = mapOutputInvoiceDetailRows(listItem, {
   TransactionDetailsData: {
     Rows: [
       formDataObj.TransactionDetailsData.Rows[0],
-      { TransactionCode: "TD.00307", Type: "SERVICES", Code: "150203", Name: "Jasa kedua", Quantity: 2.5, TotalPrice: 1250000, Discount: 50000, TaxBase: 1200000, OtherTaxBase: 1100000, VATRate: 0.11, VAT: 132000, STLGRate: 0.2, STLG: 220000 }
+      { TransactionCode: "TD.00307", Type: "SERVICES", Code: "150203", Name: "Jasa kedua", Quantity: 2.5, UnitPrice: 500000, TotalPrice: 1250000, Discount: 50000, TaxBase: 1200000, OtherTaxBase: 1100000, VATRate: 0.11, VAT: 132000, STLGRate: 0.2, STLG: 220000 }
     ]
   }
 }, "detail.pdf");
@@ -78,7 +79,7 @@ assert.equal(twoRows.length, 2);
 assert.equal(twoRows[1]["Kode Transaksi"], "TD.00307");
 assert.equal(twoRows[1]["Tipe Barang/Jasa"], "SERVICES");
 assert.equal(twoRows[1]["Kode Barang/Jasa"], "150203");
-assert.equal(twoRows[1]["Harga Satuan"], 1250000);
+assert.equal(twoRows[1]["Harga Satuan"], 500000);
 assert.equal(twoRows[1]["Jumlah Barang Jasa"], 2.5);
 assert.equal(twoRows[1]["Potongan Harga"], 50000);
 assert.equal(twoRows[1]["DPP"], 1200000);
@@ -91,7 +92,7 @@ assert.equal(twoRows[1]["PPnBM"], 220000);
 const nullMoney = mapOutputInvoiceDetailRows(listItem, {
   ...formDataObj,
   TransactionDetailsData: {
-    Rows: [{ Name: "Nilai kosong", Quantity: null, TotalPrice: null, Discount: 0, TaxBase: null, OtherTaxBase: null, VATRate: null, VAT: null, STLGRate: null, STLG: null }]
+    Rows: [{ Name: "Nilai kosong", Quantity: null, UnitPrice: null, TotalPrice: null, Discount: 0, TaxBase: null, OtherTaxBase: null, VATRate: null, VAT: null, STLGRate: null, STLG: null }]
   }
 }, "detail.pdf")[0];
 assert.equal(nullMoney["Harga Satuan"], null);
