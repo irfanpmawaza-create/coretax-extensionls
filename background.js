@@ -432,6 +432,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Pola sama dengan Faktur Keluaran di atas.
 // ============================================================
 const INPUT_INVOICE_LIST_URL = "https://coretaxdjp.pajak.go.id/einvoiceportal/api/inputinvoice/list";
+const INPUT_INVOICE_VIEW_URL = "https://coretaxdjp.pajak.go.id/einvoiceportal/api/inputinvoice/view";
 const inputInvoiceContexts = new Map();
 
 function getInputInvoiceContext(tabId) {
@@ -476,7 +477,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   ["requestHeaders", "extraHeaders"]
 );
 
-async function executeInputInvoiceFetch(tabId, authorization, payload) {
+async function executeInputInvoiceFetch(tabId, authorization, payload, endpoint = INPUT_INVOICE_LIST_URL) {
   const injectionResults = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
@@ -507,7 +508,7 @@ async function executeInputInvoiceFetch(tabId, authorization, payload) {
         data
       };
     },
-    args: [INPUT_INVOICE_LIST_URL, authorization, payload]
+    args: [endpoint, authorization, payload]
   });
 
   return injectionResults?.[0]?.result || null;
@@ -589,6 +590,78 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })
     .catch((error) => {
       console.error("Gagal mengambil Faktur Masukan multi periode:", error);
+      sendResponse({ success: false, message: error.message || String(error) });
+    });
+
+  return true;
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action !== "fetchInputInvoiceDetail") return;
+
+  const tabId = sender.tab?.id;
+  if (!Number.isInteger(tabId)) {
+    sendResponse({ success: false, message: "Tab CoreTax tidak ditemukan." });
+    return true;
+  }
+
+  const context = inputInvoiceContexts.get(tabId);
+  const taxpayerAggregateIdentifier = context?.payloadTemplate?.TaxpayerAggregateIdentifier
+    || context?.payloadTemplate?.BuyerTaxpayerAggregateIdentifier
+    || "";
+
+  if (!context?.authorization || !taxpayerAggregateIdentifier) {
+    sendResponse({
+      success: false,
+      code: "CONTEXT_NOT_CAPTURED",
+      message: "Konteks API belum terbaca. Di halaman Faktur Masukan, ubah filter/refresh tabel sekali lalu coba lagi."
+    });
+    return true;
+  }
+
+  const recordIdentifier = String(request.recordIdentifier || "");
+  if (!recordIdentifier) {
+    sendResponse({ success: false, message: "RecordId faktur tidak tersedia." });
+    return true;
+  }
+
+  const payload = {
+    RecordIdentifier: recordIdentifier,
+    EinvoiceVATStatus: "VAT_VAT",
+    TaxpayerAggregateIdentifier: taxpayerAggregateIdentifier
+  };
+
+  executeInputInvoiceFetch(tabId, context.authorization, payload, INPUT_INVOICE_VIEW_URL)
+    .then((result) => {
+      if (!result) {
+        sendResponse({ success: false, message: "CoreTax tidak mengembalikan detail faktur." });
+        return;
+      }
+
+      if (!result.ok) {
+        sendResponse({
+          success: false,
+          status: result.status,
+          message: "Request detail CoreTax gagal (" + result.status + " " + (result.statusText || "") + ").",
+          response: result.data
+        });
+        return;
+      }
+
+      const rows = result.data?.Payload?.FormDataObj?.TransactionDetailsData?.Rows;
+      if (!result.data?.IsSuccessful || !Array.isArray(rows) || rows.length === 0) {
+        sendResponse({
+          success: false,
+          message: result.data?.Message || "Data rincian transaksi tidak tersedia.",
+          response: result.data
+        });
+        return;
+      }
+
+      sendResponse({ success: true, response: result.data });
+    })
+    .catch((error) => {
+      console.error("Gagal mengambil detail Faktur Masukan:", error);
       sendResponse({ success: false, message: error.message || String(error) });
     });
 

@@ -70,7 +70,7 @@ const twoRows = mapOutputInvoiceDetailRows(listItem, {
   TransactionDetailsData: {
     Rows: [
       formDataObj.TransactionDetailsData.Rows[0],
-      { TransactionCode: "TD.00307", Type: "SERVICES", Code: "150203", Name: "Jasa kedua", Quantity: 2.5, UnitPrice: 500000, TotalPrice: 1250000, Discount: 50000, TaxBase: 1200000, OtherTaxBase: 1100000, VATRate: 0.11, VAT: 132000, STLGRate: 0.2, STLG: 220000 }
+      { TransactionCode: "TD.00307", Type: "SERVICES", Code: "150203", Name: "Jasa kedua", Quantity: 2.5, UnitPrice: 500000.75, TotalPrice: 1250000, Discount: 50000, TaxBase: 1200000, OtherTaxBase: 1100000, VATRate: 0.11, VAT: 132000, STLGRate: 0.2, STLG: 220000 }
     ]
   }
 }, "detail.pdf");
@@ -79,7 +79,7 @@ assert.equal(twoRows.length, 2);
 assert.equal(twoRows[1]["Kode Transaksi"], "TD.00307");
 assert.equal(twoRows[1]["Tipe Barang/Jasa"], "SERVICES");
 assert.equal(twoRows[1]["Kode Barang/Jasa"], "150203");
-assert.equal(twoRows[1]["Harga Satuan"], 500000);
+assert.equal(twoRows[1]["Harga Satuan"], 500000.75);
 assert.equal(twoRows[1]["Jumlah Barang Jasa"], 2.5);
 assert.equal(twoRows[1]["Potongan Harga"], 50000);
 assert.equal(twoRows[1]["DPP"], 1200000);
@@ -88,6 +88,25 @@ assert.equal(twoRows[1]["Tarif PPN"], 11);
 assert.equal(twoRows[1]["PPN"], 132000);
 assert.equal(twoRows[1]["Tarif PPnBM"], 20);
 assert.equal(twoRows[1]["PPnBM"], 220000);
+
+const inputRows = mapOutputInvoiceDetailRows(listItem, {
+  ...formDataObj,
+  TransactionDocumentData: {
+    ...formDataObj.TransactionDocumentData,
+    SellerAddress: "JL KARYA INDAH B 9"
+  }
+}, "masukan.pdf", {
+  name: "PT WIJAYA ARMADA SENTOSA",
+  tin: "0839964871216000",
+  documentNumber: "",
+  address: "JL KARYA INDAH B 9",
+  email: ""
+});
+assert.equal(inputRows[0]["Lawan Transaksi"], "PT WIJAYA ARMADA SENTOSA");
+assert.equal(inputRows[0]["NPWP Lawan Transaksi"], "0839964871216000");
+assert.equal(inputRows[0]["Alamat Lawan Transaksi"], "JL KARYA INDAH B 9");
+assert.equal(inputRows[0]["Nomor Dokumen"], "");
+assert.equal(inputRows[0]["Email"], "");
 
 const nullMoney = mapOutputInvoiceDetailRows(listItem, {
   ...formDataObj,

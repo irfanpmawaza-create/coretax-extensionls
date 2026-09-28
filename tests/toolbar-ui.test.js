@@ -16,6 +16,11 @@ assert.match(content, /showPopupMessage\(message, failedDocuments\.length > 0 \?
 assert.match(css, /width:\s*min\(220px, calc\(100vw - 24px\)\)/);
 assert.match(css, /\.coretax-toolbar__button\s*\{[\s\S]*?width:\s*100%/);
 assert.match(css, /animation:\s*coretax-result-blink/);
+assert.match(content, /EInvoiceMenuType: invoiceType === "input" \? "Input" : "Outgoing"/);
+assert.match(content, /DocumentDate: item\.LastUpdatedDate \|\| ""/);
+assert.match(content, /AmendedDocumentFormAggregateIdentifier/);
+assert.match(content, /CanceledDocumentFormAggregateIdentifier/);
+assert.doesNotMatch(content, /EInvoiceMenuType:[^\n]*"Incoming"/);
 assert.doesNotMatch(content, /169\.236px/);
 
 console.log("toolbar-ui: ok");

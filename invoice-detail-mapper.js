@@ -16,6 +16,12 @@
     return Number.isFinite(number) ? Math.round(number) : null;
   };
 
+  const numberOrNull = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  };
+
   const roundToTwoDecimals = (value) => {
     if (value === null || value === undefined || value === "") return null;
     const number = Number(value);
@@ -41,7 +47,7 @@
     return `${dd}/${mm}/${date.getFullYear()}`;
   };
 
-  return function mapOutputInvoiceDetailRows(listItem, formDataObj, fileName) {
+  return function mapOutputInvoiceDetailRows(listItem, formDataObj, fileName, counterparty) {
     const documentData = formDataObj?.TransactionDocumentData;
     const buyerData = formDataObj?.BuyerInformationData;
     const detailRows = formDataObj?.TransactionDetailsData?.Rows;
@@ -57,6 +63,11 @@
       || listItem?.BuyerTaxpayerNameClear
       || listItem?.BuyerName
       || "";
+    const counterpartyName = counterparty ? counterparty.name : buyerName;
+    const counterpartyTin = counterparty ? counterparty.tin : (buyerData.BuyerTIN || listItem?.BuyerTIN);
+    const counterpartyDocumentNumber = counterparty ? counterparty.documentNumber : buyerData.IDDocumentNumber;
+    const counterpartyAddress = counterparty ? counterparty.address : buyerData.BuyerTaxpayerAddress;
+    const counterpartyEmail = counterparty ? counterparty.email : buyerData.BuyerTaxpayerEmail;
 
     return detailRows.map((row) => ({
       "File": fileName || "",
@@ -67,12 +78,12 @@
       "Tipe Barang/Jasa": cleanText(row?.Type),
       "Kode Barang/Jasa": cleanText(row?.Code),
       "Nama Barang/Jasa": cleanText(row?.Name || row?.Code),
-      "Lawan Transaksi": cleanText(buyerName),
-      "NPWP Lawan Transaksi": cleanText(buyerData.BuyerTIN || listItem?.BuyerTIN).replace(/[^0-9]/g, ""),
-      "Nomor Dokumen": cleanText(buyerData.IDDocumentNumber),
-      "Alamat Lawan Transaksi": cleanText(buyerData.BuyerTaxpayerAddress),
-      "Email": cleanText(buyerData.BuyerTaxpayerEmail),
-      "Harga Satuan": roundMoney(row?.UnitPrice),
+      "Lawan Transaksi": cleanText(counterpartyName),
+      "NPWP Lawan Transaksi": cleanText(counterpartyTin).replace(/[^0-9]/g, ""),
+      "Nomor Dokumen": cleanText(counterpartyDocumentNumber),
+      "Alamat Lawan Transaksi": cleanText(counterpartyAddress),
+      "Email": cleanText(counterpartyEmail),
+      "Harga Satuan": numberOrNull(row?.UnitPrice),
       "Jumlah Barang Jasa": roundToTwoDecimals(row?.Quantity),
       "Potongan Harga": roundMoney(row?.Discount),
       "DPP": roundMoney(row?.TaxBase),

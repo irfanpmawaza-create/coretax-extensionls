@@ -546,14 +546,24 @@
     }
 
     async fetchInvoicePdfBlob(item, invoiceType) {
+      const status = item.TaxInvoiceStatus || "";
+      const isAmended = status === "AMENDED" || status === "WAITING_FOR_AMENDMENT";
+      const isCanceled = status === "CANCELED" || status === "WAITING_FOR_CANCELLATION";
+      const invoiceNumber = item.TaxInvoiceNumber || "";
       const body = {
         EInvoiceRecordIdentifier: item.RecordId || "",
         EInvoiceAggregateIdentifier: item.AggregateIdentifier || "",
-        DocumentAggregateIdentifier: item.DocumentFormAggregateIdentifier || "",
-        LetterNumber: item.TaxInvoiceNumber || "",
-        DocumentDate: item.TaxInvoiceDate || "",
-        EInvoiceMenuType: invoiceType === "input" ? "Incoming" : "Outgoing",
-        TaxInvoiceStatus: item.TaxInvoiceStatus || ""
+        DocumentAggregateIdentifier: (
+          isAmended
+            ? item.AmendedDocumentFormAggregateIdentifier
+            : isCanceled
+              ? item.CanceledDocumentFormAggregateIdentifier
+              : item.DocumentFormAggregateIdentifier
+        ) || "",
+        LetterNumber: `${invoiceNumber}${isAmended ? "A" : isCanceled ? "C" : ""}`,
+        DocumentDate: item.LastUpdatedDate || "",
+        EInvoiceMenuType: invoiceType === "input" ? "Input" : "Outgoing",
+        TaxInvoiceStatus: status
       };
 
       const result = await this.sendMessageToBackground({ action: "fetchInvoicePdf", invoiceType, body });
@@ -575,20 +585,20 @@
       return { blob, fileName: this.buildInvoicePdfFileName(item, invoiceType) };
     }
 
-    async fetchOutputInvoiceDetail(item) {
+    async fetchInvoiceDetail(item, invoiceType) {
       const result = await this.sendMessageToBackground({
-        action: "fetchOutputInvoiceDetail",
+        action: invoiceType === "input" ? "fetchInputInvoiceDetail" : "fetchOutputInvoiceDetail",
         recordIdentifier: item.RecordId || ""
       });
 
       if (!result?.success) {
-        throw new Error(result?.message || "Gagal mengambil detail Faktur Keluaran.");
+        throw new Error(result?.message || `Gagal mengambil detail Faktur ${invoiceType === "input" ? "Masukan" : "Keluaran"}.`);
       }
 
-      return result.response?.Payload?.FormDataObj;
+      return result.response?.Payload;
     }
 
-    async fetchOutputInvoiceDetailsForItems(allInvoices) {
+    async fetchInvoiceDetailsForItems(allInvoices, invoiceType) {
       const failedDocuments = [];
       const itemExcelRows = [];
       let detailSuccessCount = 0;
@@ -596,11 +606,20 @@
       // ponytail: serial tanpa jeda untuk menjaga beban CoreTax; tambah worker pool hanya jika benchmark membutuhkannya.
       for (const item of allInvoices) {
         try {
-          const formDataObj = await this.fetchOutputInvoiceDetail(item);
+          const payload = await this.fetchInvoiceDetail(item, invoiceType);
+          const formDataObj = payload?.FormDataObj;
+          const counterparty = invoiceType === "input" ? {
+            name: payload?.SellerName || item.SellerTaxpayerName,
+            tin: payload?.SellerTIN || item.SellerTIN,
+            documentNumber: "",
+            address: formDataObj?.TransactionDocumentData?.SellerAddress,
+            email: ""
+          } : null;
           const rows = window.mapOutputInvoiceDetailRows(
             item,
             formDataObj,
-            this.buildInvoicePdfFileName(item, "output")
+            this.buildInvoicePdfFileName(item, invoiceType),
+            counterparty
           );
           itemExcelRows.push(...rows);
           detailSuccessCount++;
@@ -702,7 +721,7 @@
       }
 
       if (options.buildItemExcel) {
-        const detailResult = await this.fetchOutputInvoiceDetailsForItems(allInvoices);
+        const detailResult = await this.fetchInvoiceDetailsForItems(allInvoices, "output");
         failedDocuments.push(...detailResult.failedDocuments);
         message += `\nDetail API berhasil: ${detailResult.detailSuccessCount} faktur, ${detailResult.itemExcelRows.length} baris; gagal: ${detailResult.failedDocuments.length}.`;
 
@@ -817,35 +836,49 @@
         ? `Faktur_Masukan_${year}_${startLabel}.xlsx`
         : `Faktur_Masukan_${year}_${startLabel}-${endLabel}.xlsx`;
 
-      let message = `Selesai. ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
-      let failedPdfs = [];
+      let message = `Selesai memproses ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}).`;
+      const failedDocuments = [];
+      let outputFileName = "";
 
-      if (options.savePdf || options.buildItemExcel) {
+      if (options.savePdf) {
         const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, "input", {
-          savePdf: options.savePdf,
-          buildItemExcel: options.buildItemExcel
+          savePdf: true,
+          buildItemExcel: false
         });
-        failedPdfs = pdfResult.failedPdfs;
-        if (options.savePdf) {
-          message += `\nPDF tersimpan: ${pdfResult.pdfSuccessCount}, PDF gagal: ${failedPdfs.length}.`;
-        }
-        if (options.buildItemExcel && pdfResult.itemExcelRows.length > 0) {
+        failedDocuments.push(...pdfResult.failedPdfs.map((item) => ({
+          ...item,
+          reason: `PDF: ${item.reason}`
+        })));
+        message += `\nPDF tersimpan: ${pdfResult.pdfSuccessCount}, PDF gagal: ${pdfResult.failedPdfs.length}.`;
+      }
+
+      if (options.buildItemExcel) {
+        const detailResult = await this.fetchInvoiceDetailsForItems(allInvoices, "input");
+        failedDocuments.push(...detailResult.failedDocuments);
+        message += `\nDetail API berhasil: ${detailResult.detailSuccessCount} faktur, ${detailResult.itemExcelRows.length} baris; gagal: ${detailResult.failedDocuments.length}.`;
+
+        if (detailResult.itemExcelRows.length > 0) {
           const itemFileName = startMonth === endMonth
             ? `Faktur_Masukan_Rincian_${year}_${startLabel}.xlsx`
             : `Faktur_Masukan_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
-          const excelRows = pdfResult.itemExcelRows.map(({ File, ...row }) => row);
+          const excelRows = detailResult.itemExcelRows.map(({ File, ...row }) => row);
           this.excelExporter.export(excelRows, itemFileName);
-          message += `\nExcel rincian per barang: ${pdfResult.itemExcelRows.length} baris (${itemFileName}).`;
+          outputFileName = itemFileName;
+          message += `\nExcel rincian per barang: ${itemFileName}.`;
+        } else {
+          message += `\nExcel rincian tidak dibuat karena tidak ada detail yang berhasil diambil.`;
         }
       }
 
       if (!options.savePdf && !options.buildItemExcel) {
         const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
         this.excelExporter.export(excelRows, fileName, "output");
+        outputFileName = fileName;
+        message += `\nExcel ringkasan: ${fileName}.`;
       }
 
-      this.showFinalNotification(message, failedPdfs);
-      return { success: true, message, count: allInvoices.length, fileName };
+      this.showFinalNotification(message, failedDocuments);
+      return { success: true, message, count: allInvoices.length, fileName: outputFileName };
     }
 
     getWithholdingPeriodCode(month, year) {
