@@ -5,9 +5,11 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
 const content = fs.readFileSync(path.join(root, "content.js"), "utf8");
+const background = fs.readFileSync(path.join(root, "background.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "toolbar.css"), "utf8");
 
 assert(manifest.content_scripts[0].css.includes("toolbar.css"));
+assert(manifest.content_scripts[0].js.includes("withholding-slip-mapper.js"));
 assert.match(content, /aria-expanded/);
 assert.match(content, /aria-live/);
 assert.match(content, /keepToolbarInViewport/);
@@ -20,6 +22,12 @@ assert.match(content, /EInvoiceMenuType: invoiceType === "input" \? "Input" : "O
 assert.match(content, /DocumentDate: item\.LastUpdatedDate \|\| ""/);
 assert.match(content, /AmendedDocumentFormAggregateIdentifier/);
 assert.match(content, /CanceledDocumentFormAggregateIdentifier/);
+assert.match(content, /fetchAllWithholdingSlipsForMonth[\s\S]*?first \+= data\.length/);
+assert.match(content, /fetchBppuTaxObjectDescriptions/);
+assert.match(content, /fetchBppuDetailsForItems/);
+assert.match(background, /getmywithholdingslip/);
+assert.match(background, /viewebupotbpu/);
+assert.match(background, /Payload\?\.Result/);
 assert.doesNotMatch(content, /EInvoiceMenuType:[^\n]*"Incoming"/);
 assert.doesNotMatch(content, /169\.236px/);
 

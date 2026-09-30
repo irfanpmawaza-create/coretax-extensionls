@@ -933,16 +933,62 @@
         }
 
         if (data.length === 0) break;
-        if (data.length < rows) break;
-        if (totalRecords !== null && first + data.length >= totalRecords) break;
-
-        first += rows;
+        first += data.length;
+        if (totalRecords !== null && first >= totalRecords) break;
+        if (totalRecords === null && data.length < rows) break;
       }
 
       return collected;
     }
 
-    mapWithholdingSlipToExcelRow(item) {
+    async fetchBppuTaxObjectDescriptions() {
+      const result = await this.sendMessageToBackground({ action: "fetchBppuTaxObjects" });
+      if (!result?.success) {
+        throw new Error(result?.message || "Gagal mengambil referensi objek pajak BPPU.");
+      }
+
+      const descriptions = {};
+      for (const item of result.response?.Payload || []) {
+        if (item.AppLanguageID !== "id-ID") continue;
+        try {
+          const taxObjectCode = JSON.parse(item.ParameterData || "{}").TaxObjectCode;
+          if (taxObjectCode) descriptions[taxObjectCode] = item.CodeDescription || "";
+        } catch (_) {
+          // Abaikan satu referensi rusak; kode lain tetap dapat diekspor.
+        }
+      }
+      return descriptions;
+    }
+
+    async fetchBppuDetailsForItems(items) {
+      const enrichedItems = [];
+      const failedDocuments = [];
+
+      for (const item of items) {
+        try {
+          const result = await this.sendMessageToBackground({
+            action: "fetchBppuDetail",
+            recordId: item.RecordId || ""
+          });
+          if (!result?.success) throw new Error(result?.message || "Detail Bupot BPPU gagal diambil.");
+          enrichedItems.push({ ...item, DocumentNumber: result.detail?.DocumentNumber || "" });
+        } catch (error) {
+          enrichedItems.push({ ...item, DocumentNumber: "" });
+          failedDocuments.push({
+            number: item.WithholdingSlipsNumber || "?",
+            reason: error.message || String(error)
+          });
+        }
+      }
+
+      return { enrichedItems, failedDocuments };
+    }
+
+    mapWithholdingSlipToExcelRow(item, taxObjectDescriptions = {}) {
+      if (Object.hasOwn(item, "EmployerNik") || Object.hasOwn(item, "EmployerName")) {
+        return window.mapBppuWithholdingSlipToExcelRow(item, taxObjectDescriptions);
+      }
+
       const periodMonth = Number(String(item.TaxPeriodCode || "").slice(0, 2));
       return {
         "Masa Pajak": this.getMonthName(periodMonth),
@@ -986,17 +1032,27 @@
         throw new Error("Tidak ada Bukti Potong yang ditemukan untuk periode tersebut.");
       }
 
-      const excelRows = allSlips.map((item) => this.mapWithholdingSlipToExcelRow(item));
+      const isBppu = allSlips.some((item) => Object.hasOwn(item, "EmployerNik") || Object.hasOwn(item, "EmployerName"));
+      let exportSlips = allSlips;
+      let failedDocuments = [];
+      if (isBppu) {
+        const detailResult = await this.fetchBppuDetailsForItems(allSlips);
+        exportSlips = detailResult.enrichedItems;
+        failedDocuments = detailResult.failedDocuments;
+      }
+      const taxObjectDescriptions = isBppu ? await this.fetchBppuTaxObjectDescriptions() : {};
+      const excelRows = exportSlips.map((item) => this.mapWithholdingSlipToExcelRow(item, taxObjectDescriptions));
       const startLabel = this.getMonthName(startMonth).slice(0, 3);
       const endLabel = this.getMonthName(endMonth).slice(0, 3);
+      const filePrefix = isBppu ? "eBupot_BPPU" : "Bukti_Potong";
       const fileName = startMonth === endMonth
-        ? `Bukti_Potong_${year}_${startLabel}.xlsx`
-        : `Bukti_Potong_${year}_${startLabel}-${endLabel}.xlsx`;
+        ? `${filePrefix}_${year}_${startLabel}.xlsx`
+        : `${filePrefix}_${year}_${startLabel}-${endLabel}.xlsx`;
 
       this.excelExporter.export(excelRows, fileName, "output");
 
-      const message = `Selesai. ${allSlips.length} Bukti Potong (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.`;
-      this.showFinalNotification(message, []);
+      const message = `Selesai. ${allSlips.length} Bukti Potong (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}) diekspor ke Excel.${failedDocuments.length ? ` Detail gagal: ${failedDocuments.length}.` : ""}`;
+      this.showFinalNotification(message, failedDocuments);
       return { success: true, message, count: allSlips.length, fileName };
     }
 
