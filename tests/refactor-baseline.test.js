@@ -132,7 +132,9 @@ function loadBackground() {
 }
 
 function listenerFor(entries, url) {
-  return entries.find(({ filter }) => filter.urls.includes(url)).listener;
+  return entries.find(({ filter }) => filter.urls.some((pattern) => (
+    pattern === url || (pattern.endsWith("*") && url.startsWith(pattern.slice(0, -1)))
+  ))).listener;
 }
 
 function sendRuntimeMessage(listeners, request, tabId) {
@@ -142,6 +144,87 @@ function sendRuntimeMessage(listeners, request, tabId) {
     }
     reject(new Error(`Tidak ada listener untuk ${request.action}`));
   });
+}
+
+async function assertInvoicePayload(background, { endpoint, action, tabId }) {
+  const template = {
+    Filters: [
+      { PropertyName: "TaxInvoicePeriod", Value: ["TD.00701"] },
+      { PropertyName: "TaxInvoiceYear", Value: "2025" }
+    ],
+    LanguageId: "id-ID",
+    Untouched: "keep"
+  };
+  const bytes = new TextEncoder().encode(JSON.stringify(template)).buffer;
+  listenerFor(background.beforeRequests, endpoint)({
+    method: "POST",
+    tabId,
+    requestBody: { raw: [{ bytes }] }
+  });
+  listenerFor(background.beforeHeaders, endpoint)({
+    method: "POST",
+    tabId,
+    requestHeaders: [{ name: "Authorization", value: "Bearer token" }]
+  });
+
+  const response = await sendRuntimeMessage(background.runtimeListeners, {
+    action,
+    periodCode: "TD.00702",
+    year: 2026,
+    first: 50,
+    rows: 25
+  }, tabId);
+  assert.equal(response.success, true);
+
+  const [calledEndpoint, authorization, payload] = background.scriptCalls.at(-1).args;
+  assert.equal(calledEndpoint, endpoint);
+  assert.equal(authorization, "Bearer token");
+  assert.equal(payload.First, 50);
+  assert.equal(payload.Rows, 25);
+  assert.equal(payload.Untouched, "keep");
+  assert.deepEqual(JSON.parse(JSON.stringify(payload.Filters)), [
+    { PropertyName: "TaxInvoicePeriod", Value: ["TD.00702"] },
+    { PropertyName: "TaxInvoiceYear", Value: "2026" }
+  ]);
+  assert.equal(template.Filters[0].Value[0], "TD.00701");
+}
+
+async function assertWithholdingPayload(background) {
+  const endpoint = "https://coretaxdjp.pajak.go.id/withholdingslipsportal/api/getmywithholdingslip";
+  const template = {
+    Filters: [{ PropertyName: "TaxPeriodCode", Value: ["01012026"] }],
+    TaxPeriod: "TD.00701",
+    TaxYear: "2025"
+  };
+  const bytes = new TextEncoder().encode(JSON.stringify(template)).buffer;
+  listenerFor(background.beforeRequests, endpoint)({
+    method: "POST",
+    tabId: 9,
+    url: endpoint,
+    requestBody: { raw: [{ bytes }] }
+  });
+  listenerFor(background.beforeHeaders, endpoint)({
+    method: "POST",
+    tabId: 9,
+    url: endpoint,
+    requestHeaders: [{ name: "Authorization", value: "Bearer bupot" }]
+  });
+
+  const response = await sendRuntimeMessage(background.runtimeListeners, {
+    action: "fetchWithholdingSlipsPage",
+    periodCode: "02022026",
+    first: 50,
+    rows: 25
+  }, 9);
+  assert.equal(response.success, true);
+
+  const [calledEndpoint, authorization, payload] = background.scriptCalls.at(-1).args;
+  assert.equal(calledEndpoint, endpoint);
+  assert.equal(authorization, "Bearer bupot");
+  assert.equal(payload.TaxPeriod, "TD.00702");
+  assert.equal(payload.TaxYear, "2026");
+  assert.equal(payload.Filters[0].Value, "02022026");
+  assert.equal(template.Filters[0].Value[0], "01012026");
 }
 
 (async () => {
@@ -183,47 +266,17 @@ function sendRuntimeMessage(listeners, request, tabId) {
   assert.equal(app.buildInvoicePdfFileName(invoice, "input"), "040.026_CV_CD_Sep2026.pdf");
 
   const background = loadBackground();
-  const endpoint = "https://coretaxdjp.pajak.go.id/einvoiceportal/api/outputinvoice/list";
-  const template = {
-    Filters: [
-      { PropertyName: "TaxInvoicePeriod", Value: ["TD.00701"] },
-      { PropertyName: "TaxInvoiceYear", Value: "2025" }
-    ],
-    LanguageId: "id-ID",
-    Untouched: "keep"
-  };
-  const bytes = new TextEncoder().encode(JSON.stringify(template)).buffer;
-  listenerFor(background.beforeRequests, endpoint)({
-    method: "POST",
-    tabId: 7,
-    requestBody: { raw: [{ bytes }] }
-  });
-  listenerFor(background.beforeHeaders, endpoint)({
-    method: "POST",
-    tabId: 7,
-    requestHeaders: [{ name: "Authorization", value: "Bearer token" }]
-  });
-
-  const response = await sendRuntimeMessage(background.runtimeListeners, {
+  await assertInvoicePayload(background, {
+    endpoint: "https://coretaxdjp.pajak.go.id/einvoiceportal/api/outputinvoice/list",
     action: "fetchOutputInvoicesPage",
-    periodCode: "TD.00702",
-    year: 2026,
-    first: 50,
-    rows: 25
-  }, 7);
-  assert.equal(response.success, true);
-
-  const [calledEndpoint, authorization, payload] = background.scriptCalls.at(-1).args;
-  assert.equal(calledEndpoint, endpoint);
-  assert.equal(authorization, "Bearer token");
-  assert.equal(payload.First, 50);
-  assert.equal(payload.Rows, 25);
-  assert.equal(payload.Untouched, "keep");
-  assert.deepEqual(JSON.parse(JSON.stringify(payload.Filters)), [
-    { PropertyName: "TaxInvoicePeriod", Value: ["TD.00702"] },
-    { PropertyName: "TaxInvoiceYear", Value: "2026" }
-  ]);
-  assert.equal(template.Filters[0].Value[0], "TD.00701");
+    tabId: 7
+  });
+  await assertInvoicePayload(background, {
+    endpoint: "https://coretaxdjp.pajak.go.id/einvoiceportal/api/inputinvoice/list",
+    action: "fetchInputInvoicesPage",
+    tabId: 8
+  });
+  await assertWithholdingPayload(background);
 
   console.log("refactor-baseline: ok");
 })().catch((error) => {

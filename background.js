@@ -200,9 +200,39 @@ function decodeRequestBody(details) {
     text += decoder.decode();
     return text ? JSON.parse(text) : null;
   } catch (error) {
-    console.warn("Gagal membaca payload outputinvoice/list:", error);
+    console.warn("Gagal membaca payload request CoreTax:", error);
     return null;
   }
+}
+
+function upsertFilter(filters, propertyName, value, preserveArray = false) {
+  const existing = filters.find((item) => item.PropertyName === propertyName);
+  if (existing) {
+    existing.Value = preserveArray && Array.isArray(existing.Value) ? [value] : value;
+    return;
+  }
+  filters.push({
+    PropertyName: propertyName,
+    Value: value,
+    MatchMode: "equals",
+    CaseSensitive: true,
+    AsString: false
+  });
+}
+
+function buildInvoiceListPayload(base, { periodCode, year, first, rows }) {
+  const filters = Array.isArray(base.Filters)
+    ? base.Filters.map((item) => ({ ...item }))
+    : [];
+  upsertFilter(filters, "TaxInvoicePeriod", periodCode, true);
+  upsertFilter(filters, "TaxInvoiceYear", String(year || ""), true);
+  return {
+    ...base,
+    First: Number(first || 0),
+    Rows: Number(rows || 50),
+    Filters: filters,
+    LanguageId: base.LanguageId || "id-ID"
+  };
 }
 
 chrome.webRequest.onBeforeRequest.addListener(
@@ -236,7 +266,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   ["requestHeaders", "extraHeaders"]
 );
 
-async function executeOutputInvoiceFetch(tabId, authorization, payload, endpoint = OUTPUT_INVOICE_LIST_URL) {
+async function executeCoreTaxFetch(tabId, authorization, payload, endpoint) {
   const injectionResults = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
@@ -292,43 +322,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  const periodCode = request.periodCode;
-  const year = String(request.year || "");
-  const first = Number(request.first || 0);
-  const rows = Number(request.rows || 50);
+  const payload = buildInvoiceListPayload(context.payloadTemplate, request);
 
-  const base = context.payloadTemplate;
-  const filters = Array.isArray(base.Filters)
-    ? base.Filters.map((item) => ({ ...item }))
-    : [];
-
-  const upsertFilter = (propertyName, value) => {
-    const existing = filters.find((item) => item.PropertyName === propertyName);
-    if (existing) {
-      existing.Value = Array.isArray(existing.Value) ? [value] : value;
-    } else {
-      filters.push({
-        PropertyName: propertyName,
-        Value: value,
-        MatchMode: "equals",
-        CaseSensitive: true,
-        AsString: false
-      });
-    }
-  };
-
-  upsertFilter("TaxInvoicePeriod", periodCode);
-  upsertFilter("TaxInvoiceYear", year);
-
-  const payload = {
-    ...base,
-    First: first,
-    Rows: rows,
-    Filters: filters,
-    LanguageId: base.LanguageId || "id-ID"
-  };
-
-  executeOutputInvoiceFetch(tabId, context.authorization, payload)
+  executeCoreTaxFetch(tabId, context.authorization, payload, OUTPUT_INVOICE_LIST_URL)
     .then((result) => {
       if (!result) {
         sendResponse({ success: false, message: "CoreTax tidak mengembalikan hasil." });
@@ -390,7 +386,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     TaxpayerAggregateIdentifier: taxpayerAggregateIdentifier
   };
 
-  executeOutputInvoiceFetch(tabId, context.authorization, payload, OUTPUT_INVOICE_VIEW_URL)
+  executeCoreTaxFetch(tabId, context.authorization, payload, OUTPUT_INVOICE_VIEW_URL)
     .then((result) => {
       if (!result) {
         sendResponse({ success: false, message: "CoreTax tidak mengembalikan detail faktur." });
@@ -477,43 +473,6 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   ["requestHeaders", "extraHeaders"]
 );
 
-async function executeInputInvoiceFetch(tabId, authorization, payload, endpoint = INPUT_INVOICE_LIST_URL) {
-  const injectionResults = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: "MAIN",
-    func: async (endpoint, authHeader, requestPayload) => {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Accept": "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-          "Authorization": authHeader
-        },
-        body: JSON.stringify(requestPayload)
-      });
-
-      const text = await response.text();
-      let data = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch (_) {
-        data = { rawText: text };
-      }
-
-      return {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        data
-      };
-    },
-    args: [endpoint, authorization, payload]
-  });
-
-  return injectionResults?.[0]?.result || null;
-}
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action !== "fetchInputInvoicesPage") return;
 
@@ -533,43 +492,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  const periodCode = request.periodCode;
-  const year = String(request.year || "");
-  const first = Number(request.first || 0);
-  const rows = Number(request.rows || 50);
+  const payload = buildInvoiceListPayload(context.payloadTemplate, request);
 
-  const base = context.payloadTemplate;
-  const filters = Array.isArray(base.Filters)
-    ? base.Filters.map((item) => ({ ...item }))
-    : [];
-
-  const upsertFilter = (propertyName, value) => {
-    const existing = filters.find((item) => item.PropertyName === propertyName);
-    if (existing) {
-      existing.Value = Array.isArray(existing.Value) ? [value] : value;
-    } else {
-      filters.push({
-        PropertyName: propertyName,
-        Value: value,
-        MatchMode: "equals",
-        CaseSensitive: true,
-        AsString: false
-      });
-    }
-  };
-
-  upsertFilter("TaxInvoicePeriod", periodCode);
-  upsertFilter("TaxInvoiceYear", year);
-
-  const payload = {
-    ...base,
-    First: first,
-    Rows: rows,
-    Filters: filters,
-    LanguageId: base.LanguageId || "id-ID"
-  };
-
-  executeInputInvoiceFetch(tabId, context.authorization, payload)
+  executeCoreTaxFetch(tabId, context.authorization, payload, INPUT_INVOICE_LIST_URL)
     .then((result) => {
       if (!result) {
         sendResponse({ success: false, message: "CoreTax tidak mengembalikan hasil." });
@@ -631,7 +556,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     TaxpayerAggregateIdentifier: taxpayerAggregateIdentifier
   };
 
-  executeInputInvoiceFetch(tabId, context.authorization, payload, INPUT_INVOICE_VIEW_URL)
+  executeCoreTaxFetch(tabId, context.authorization, payload, INPUT_INVOICE_VIEW_URL)
     .then((result) => {
       if (!result) {
         sendResponse({ success: false, message: "CoreTax tidak mengembalikan detail faktur." });
@@ -729,43 +654,6 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   ["requestHeaders", "extraHeaders"]
 );
 
-async function executeWithholdingSlipFetch(tabId, authorization, payload, endpoint) {
-  const injectionResults = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: "MAIN",
-    func: async (endpoint, authHeader, requestPayload) => {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Accept": "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-          "Authorization": authHeader
-        },
-        body: JSON.stringify(requestPayload)
-      });
-
-      const text = await response.text();
-      let data = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch (_) {
-        data = { rawText: text };
-      }
-
-      return {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        data
-      };
-    },
-    args: [endpoint, authorization, payload]
-  });
-
-  return injectionResults?.[0]?.result || null;
-}
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action !== "fetchWithholdingSlipsPage") return;
 
@@ -794,22 +682,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     ? base.Filters.map((item) => ({ ...item }))
     : [];
 
-  const upsertFilter = (propertyName, value) => {
-    const existing = filters.find((item) => item.PropertyName === propertyName);
-    if (existing) {
-      existing.Value = value;
-    } else {
-      filters.push({
-        PropertyName: propertyName,
-        Value: value,
-        MatchMode: "equals",
-        CaseSensitive: true,
-        AsString: false
-      });
-    }
-  };
-
-  upsertFilter("TaxPeriodCode", periodCode);
+  upsertFilter(filters, "TaxPeriodCode", periodCode);
 
   const payload = {
     ...base,
@@ -826,7 +699,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     payload.TaxYear = String(periodCode).slice(-4);
   }
 
-  executeWithholdingSlipFetch(tabId, context.authorization, payload, context.endpoint)
+  executeCoreTaxFetch(tabId, context.authorization, payload, context.endpoint)
     .then((result) => {
       if (!result) {
         sendResponse({ success: false, message: "CoreTax tidak mengembalikan hasil." });
@@ -864,7 +737,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  executeWithholdingSlipFetch(tabId, context.authorization, {
+  executeCoreTaxFetch(tabId, context.authorization, {
     ReferenceDataType: "EBUPOTBPU_TAX_OBJECT",
     TaxpayerAggregateIdentifier: taxpayerAggregateIdentifier
   }, WITHHOLDING_TAX_OBJECT_URL)
@@ -899,7 +772,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  executeWithholdingSlipFetch(tabId, context.authorization, {
+  executeCoreTaxFetch(tabId, context.authorization, {
     RecordId: recordId,
     IsMyWithholdingMenu: true,
     TaxpayerAggregateIdentifier: taxpayerAggregateIdentifier
