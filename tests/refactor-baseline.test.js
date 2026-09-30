@@ -129,7 +129,11 @@ function loadBackground() {
     }
   };
 
-  vm.runInNewContext(fs.readFileSync(path.join(root, "background.js"), "utf8"), sandbox, {
+  const context = vm.createContext(sandbox);
+  sandbox.importScripts = (...files) => files.forEach((file) => {
+    vm.runInContext(fs.readFileSync(path.join(root, file), "utf8"), context, { filename: file });
+  });
+  vm.runInContext(fs.readFileSync(path.join(root, "background.js"), "utf8"), context, {
     filename: "background.js"
   });
   return { beforeHeaders, beforeRequests, runtimeListeners, scriptCalls };

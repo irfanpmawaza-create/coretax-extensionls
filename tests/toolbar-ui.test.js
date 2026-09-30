@@ -8,6 +8,8 @@ const content = fs.readFileSync(path.join(root, "content.js"), "utf8");
 const multiPeriod = fs.readFileSync(path.join(root, "content-multi-period.js"), "utf8");
 const contentScripts = `${content}\n${multiPeriod}`;
 const background = fs.readFileSync(path.join(root, "background.js"), "utf8");
+const backgroundWithholding = fs.readFileSync(path.join(root, "background-withholding.js"), "utf8");
+const backgroundScripts = `${background}\n${backgroundWithholding}`;
 const css = fs.readFileSync(path.join(root, "toolbar.css"), "utf8");
 
 assert(manifest.content_scripts[0].css.includes("toolbar.css"));
@@ -28,9 +30,11 @@ assert.match(contentScripts, /CanceledDocumentFormAggregateIdentifier/);
 assert.match(contentScripts, /fetchAllWithholdingSlipsForMonth[\s\S]*?first \+= data\.length/);
 assert.match(contentScripts, /fetchBppuTaxObjectDescriptions/);
 assert.match(contentScripts, /fetchBppuDetailsForItems/);
-assert.match(background, /getmywithholdingslip/);
-assert.match(background, /viewebupotbpu/);
-assert.match(background, /Payload\?\.Result/);
+assert.match(background, /importScripts\("background-downloads\.js"\)/);
+assert.match(background, /importScripts\("background-withholding\.js"\)/);
+assert.match(backgroundScripts, /getmywithholdingslip/);
+assert.match(backgroundScripts, /viewebupotbpu/);
+assert.match(backgroundScripts, /Payload\?\.Result/);
 assert.doesNotMatch(contentScripts, /EInvoiceMenuType:[^\n]*"Incoming"/);
 assert.doesNotMatch(content, /169\.236px/);
 
