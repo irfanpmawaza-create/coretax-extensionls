@@ -39,19 +39,20 @@ function loadContentApp() {
   return { app: sandbox.coreTaxApp, sandbox };
 }
 
-async function assertPagination(methodName, fetchMethodName) {
+async function assertPagination(invoiceType) {
   const { app } = loadContentApp();
   const calls = [];
   const firstPage = Array.from({ length: 50 }, (_, index) => ({ RecordId: `id-${index}` }));
   const secondPage = [{ RecordId: "id-49" }, { RecordId: "id-50" }];
-  app[fetchMethodName] = async (request) => {
+  app.fetchInvoicePage = async (type, request) => {
+    assert.equal(type, invoiceType);
     calls.push(request);
     return request.first === 0
       ? { TotalRecords: 52, Data: firstPage }
       : { TotalRecords: 52, Data: secondPage };
   };
 
-  const rows = await app[methodName](2, 2026);
+  const rows = await app.fetchAllInvoicesForMonth(invoiceType, 2, 2026);
   assert.equal(rows.length, 51);
   assert.deepEqual(calls.map(({ periodCode, year, first, rows: pageSize }) => (
     { periodCode, year, first, pageSize }
@@ -59,6 +60,26 @@ async function assertPagination(methodName, fetchMethodName) {
     { periodCode: "TD.00702", year: 2026, first: 0, pageSize: 50 },
     { periodCode: "TD.00702", year: 2026, first: 50, pageSize: 50 }
   ]);
+}
+
+async function assertSummaryExport(invoiceType, expectedFileName) {
+  const { app, sandbox } = loadContentApp();
+  const exports = [];
+  sandbox.location.hostname = "coretaxdjp.pajak.go.id";
+  sandbox.location.pathname = "/e-invoice-portal/";
+  app.fetchAllInvoicesForMonth = async (type, month, year) => {
+    assert.equal(type, invoiceType);
+    assert.equal(month, 2);
+    assert.equal(year, 2026);
+    return [{ RecordId: `${type}-1`, TaxInvoicePeriod: "TD.00702", TaxInvoiceYear: year }];
+  };
+  app.excelExporter = { export: (...args) => exports.push(args) };
+  app.showFinalNotification = () => {};
+
+  const result = await app.downloadMultiPeriodInvoices({ invoiceType, year: 2026, startMonth: 2, endMonth: 2 });
+  assert.equal(result.fileName, expectedFileName);
+  assert.equal(exports[0][1], expectedFileName);
+  assert.equal(exports[0][2], "output");
 }
 
 function loadBackground() {
@@ -124,8 +145,10 @@ function sendRuntimeMessage(listeners, request, tabId) {
 }
 
 (async () => {
-  await assertPagination("fetchAllOutputInvoicesForMonth", "fetchOutputInvoicePage");
-  await assertPagination("fetchAllInputInvoicesForMonth", "fetchInputInvoicePage");
+  await assertPagination("output");
+  await assertPagination("input");
+  await assertSummaryExport("output", "Faktur_Keluaran_2026_Feb.xlsx");
+  await assertSummaryExport("input", "Faktur_Masukan_2026_Feb.xlsx");
 
   const { app, sandbox } = loadContentApp();
   sandbox.location.hostname = "coretaxdjp.pajak.go.id";
@@ -135,9 +158,19 @@ function sendRuntimeMessage(listeners, request, tabId) {
     /Tahun tidak valid/
   );
   await assert.rejects(
-    app.downloadMultiPeriodInputInvoices({ year: 2026, startMonth: 3, endMonth: 2 }),
+    app.downloadMultiPeriodInvoices({ invoiceType: "input", year: 2026, startMonth: 3, endMonth: 2 }),
     /Rentang bulan tidak valid/
   );
+
+  const actions = [];
+  app.sendMessageToBackground = async (request) => {
+    actions.push(request.action);
+    return { success: true, response: { IsSuccessful: true, Payload: {} } };
+  };
+  const pageRequest = { periodCode: "TD.00702", year: 2026, first: 0, rows: 50 };
+  await app.fetchInvoicePage("output", pageRequest);
+  await app.fetchInvoicePage("input", pageRequest);
+  assert.deepEqual(actions, ["fetchOutputInvoicesPage", "fetchInputInvoicesPage"]);
 
   const invoice = {
     TaxInvoicePeriod: "TD.00709",

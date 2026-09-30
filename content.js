@@ -428,9 +428,10 @@
       });
     }
 
-    async fetchOutputInvoicePage({ periodCode, year, first, rows }) {
+    async fetchInvoicePage(invoiceType, { periodCode, year, first, rows }) {
+      const isInput = invoiceType === "input";
       const result = await this.sendMessageToBackground({
-        action: "fetchOutputInvoicesPage",
+        action: isInput ? "fetchInputInvoicesPage" : "fetchOutputInvoicesPage",
         periodCode,
         year,
         first,
@@ -438,7 +439,7 @@
       });
 
       if (!result?.success) {
-        throw new Error(result?.message || "Gagal mengambil data Faktur Keluaran.");
+        throw new Error(result?.message || `Gagal mengambil data Faktur ${isInput ? "Masukan" : "Keluaran"}.`);
       }
 
       const apiResponse = result.response;
@@ -449,7 +450,7 @@
       return apiResponse.Payload || { TotalRecords: 0, Data: [] };
     }
 
-    async fetchAllOutputInvoicesForMonth(month, year) {
+    async fetchAllInvoicesForMonth(invoiceType, month, year) {
       const periodCode = this.getPeriodCode(month);
       const rows = 50;
       let first = 0;
@@ -460,7 +461,7 @@
 
       while (safety < 500) {
         safety++;
-        const payload = await this.fetchOutputInvoicePage({
+        const payload = await this.fetchInvoicePage(invoiceType, {
           periodCode,
           year,
           first,
@@ -671,10 +672,10 @@
         throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
       }
 
-      if (options.invoiceType === "input") {
-        return this.downloadMultiPeriodInputInvoices(options);
-      }
+      return this.downloadMultiPeriodInvoiceType(options, options.invoiceType === "input" ? "input" : "output");
+    }
 
+    async downloadMultiPeriodInvoiceType(options, invoiceType) {
       const year = Number(options.year);
       const startMonth = Number(options.startMonth);
       const endMonth = Number(options.endMonth);
@@ -686,30 +687,34 @@
         throw new Error("Rentang bulan tidak valid.");
       }
 
+      const isInput = invoiceType === "input";
+      const typeLabel = isInput ? "Masukan" : "Keluaran";
+      const filePrefix = `Faktur_${typeLabel}`;
+      const logPrefix = isInput ? "MULTI PERIODE MASUKAN" : "MULTI PERIODE";
       const allInvoices = [];
       for (let month = startMonth; month <= endMonth; month++) {
-        console.log(`MULTI PERIODE: mengambil ${this.getMonthName(month)} ${year}...`);
-        const monthData = await this.fetchAllOutputInvoicesForMonth(month, year);
+        console.log(`${logPrefix}: mengambil ${this.getMonthName(month)} ${year}...`);
+        const monthData = await this.fetchAllInvoicesForMonth(invoiceType, month, year);
         allInvoices.push(...monthData);
-        console.log(`MULTI PERIODE: ${this.getMonthName(month)} = ${monthData.length} faktur.`);
+        console.log(`${logPrefix}: ${this.getMonthName(month)} = ${monthData.length} faktur.`);
       }
 
       if (allInvoices.length === 0) {
-        throw new Error("Tidak ada Faktur Keluaran yang ditemukan untuk periode tersebut.");
+        throw new Error(`Tidak ada Faktur ${typeLabel} yang ditemukan untuk periode tersebut.`);
       }
 
       const startLabel = this.getMonthName(startMonth).slice(0, 3);
       const endLabel = this.getMonthName(endMonth).slice(0, 3);
       const fileName = startMonth === endMonth
-        ? `Faktur_Keluaran_${year}_${startLabel}.xlsx`
-        : `Faktur_Keluaran_${year}_${startLabel}-${endLabel}.xlsx`;
+        ? `${filePrefix}_${year}_${startLabel}.xlsx`
+        : `${filePrefix}_${year}_${startLabel}-${endLabel}.xlsx`;
 
-      let message = `Selesai memproses ${allInvoices.length} Faktur Keluaran (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}).`;
+      let message = `Selesai memproses ${allInvoices.length} Faktur ${typeLabel} (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}).`;
       const failedDocuments = [];
       let outputFileName = "";
 
       if (options.savePdf) {
-        const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, "output", {
+        const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, invoiceType, {
           savePdf: true,
           buildItemExcel: false
         });
@@ -721,146 +726,14 @@
       }
 
       if (options.buildItemExcel) {
-        const detailResult = await this.fetchInvoiceDetailsForItems(allInvoices, "output");
+        const detailResult = await this.fetchInvoiceDetailsForItems(allInvoices, invoiceType);
         failedDocuments.push(...detailResult.failedDocuments);
         message += `\nDetail API berhasil: ${detailResult.detailSuccessCount} faktur, ${detailResult.itemExcelRows.length} baris; gagal: ${detailResult.failedDocuments.length}.`;
 
         if (detailResult.itemExcelRows.length > 0) {
           const itemFileName = startMonth === endMonth
-            ? `Faktur_Keluaran_Rincian_${year}_${startLabel}.xlsx`
-            : `Faktur_Keluaran_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
-          const excelRows = detailResult.itemExcelRows.map(({ File, ...row }) => row);
-          this.excelExporter.export(excelRows, itemFileName);
-          outputFileName = itemFileName;
-          message += `\nExcel rincian per barang: ${itemFileName}.`;
-        } else {
-          message += `\nExcel rincian tidak dibuat karena tidak ada detail yang berhasil diambil.`;
-        }
-      }
-
-      if (!options.savePdf && !options.buildItemExcel) {
-        const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
-        this.excelExporter.export(excelRows, fileName, "output");
-        outputFileName = fileName;
-        message += `\nExcel ringkasan: ${fileName}.`;
-      }
-
-      this.showFinalNotification(message, failedDocuments);
-      return { success: true, message, count: allInvoices.length, fileName: outputFileName };
-    }
-
-    async fetchInputInvoicePage({ periodCode, year, first, rows }) {
-      const result = await this.sendMessageToBackground({
-        action: "fetchInputInvoicesPage",
-        periodCode,
-        year,
-        first,
-        rows
-      });
-
-      if (!result?.success) {
-        throw new Error(result?.message || "Gagal mengambil data Faktur Masukan.");
-      }
-
-      const apiResponse = result.response;
-      if (!apiResponse?.IsSuccessful) {
-        throw new Error(apiResponse?.Message || "CoreTax mengembalikan status gagal.");
-      }
-
-      return apiResponse.Payload || { TotalRecords: 0, Data: [] };
-    }
-
-    async fetchAllInputInvoicesForMonth(month, year) {
-      const periodCode = this.getPeriodCode(month);
-      const rows = 50;
-      let first = 0;
-      let totalRecords = null;
-      const collected = [];
-      const seen = new Set();
-      let safety = 0;
-
-      while (safety < 500) {
-        safety++;
-        const payload = await this.fetchInputInvoicePage({ periodCode, year, first, rows });
-
-        const data = Array.isArray(payload.Data) ? payload.Data : [];
-        if (totalRecords === null && Number.isFinite(Number(payload.TotalRecords))) {
-          totalRecords = Number(payload.TotalRecords);
-        }
-
-        for (const item of data) {
-          const key = item.RecordId || item.AggregateIdentifier || `${item.TaxInvoiceNumber || ""}-${item.TaxInvoiceDate || ""}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            collected.push(item);
-          }
-        }
-
-        if (data.length === 0) break;
-        if (data.length < rows) break;
-        if (totalRecords !== null && first + data.length >= totalRecords) break;
-
-        first += rows;
-      }
-
-      return collected;
-    }
-
-    async downloadMultiPeriodInputInvoices(options = {}) {
-      const year = Number(options.year);
-      const startMonth = Number(options.startMonth);
-      const endMonth = Number(options.endMonth);
-
-      if (!Number.isInteger(year) || year < 2020 || year > 2100) {
-        throw new Error("Tahun tidak valid.");
-      }
-      if (!Number.isInteger(startMonth) || !Number.isInteger(endMonth) || startMonth < 1 || endMonth > 12 || startMonth > endMonth) {
-        throw new Error("Rentang bulan tidak valid.");
-      }
-
-      const allInvoices = [];
-      for (let month = startMonth; month <= endMonth; month++) {
-        console.log(`MULTI PERIODE MASUKAN: mengambil ${this.getMonthName(month)} ${year}...`);
-        const monthData = await this.fetchAllInputInvoicesForMonth(month, year);
-        allInvoices.push(...monthData);
-        console.log(`MULTI PERIODE MASUKAN: ${this.getMonthName(month)} = ${monthData.length} faktur.`);
-      }
-
-      if (allInvoices.length === 0) {
-        throw new Error("Tidak ada Faktur Masukan yang ditemukan untuk periode tersebut.");
-      }
-
-      const startLabel = this.getMonthName(startMonth).slice(0, 3);
-      const endLabel = this.getMonthName(endMonth).slice(0, 3);
-      const fileName = startMonth === endMonth
-        ? `Faktur_Masukan_${year}_${startLabel}.xlsx`
-        : `Faktur_Masukan_${year}_${startLabel}-${endLabel}.xlsx`;
-
-      let message = `Selesai memproses ${allInvoices.length} Faktur Masukan (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}).`;
-      const failedDocuments = [];
-      let outputFileName = "";
-
-      if (options.savePdf) {
-        const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, "input", {
-          savePdf: true,
-          buildItemExcel: false
-        });
-        failedDocuments.push(...pdfResult.failedPdfs.map((item) => ({
-          ...item,
-          reason: `PDF: ${item.reason}`
-        })));
-        message += `\nPDF tersimpan: ${pdfResult.pdfSuccessCount}, PDF gagal: ${pdfResult.failedPdfs.length}.`;
-      }
-
-      if (options.buildItemExcel) {
-        const detailResult = await this.fetchInvoiceDetailsForItems(allInvoices, "input");
-        failedDocuments.push(...detailResult.failedDocuments);
-        message += `\nDetail API berhasil: ${detailResult.detailSuccessCount} faktur, ${detailResult.itemExcelRows.length} baris; gagal: ${detailResult.failedDocuments.length}.`;
-
-        if (detailResult.itemExcelRows.length > 0) {
-          const itemFileName = startMonth === endMonth
-            ? `Faktur_Masukan_Rincian_${year}_${startLabel}.xlsx`
-            : `Faktur_Masukan_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
+            ? `${filePrefix}_Rincian_${year}_${startLabel}.xlsx`
+            : `${filePrefix}_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
           const excelRows = detailResult.itemExcelRows.map(({ File, ...row }) => row);
           this.excelExporter.export(excelRows, itemFileName);
           outputFileName = itemFileName;
