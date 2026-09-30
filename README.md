@@ -56,6 +56,33 @@ Wajib ada di folder `libs`:
 - Uji saat login/session CoreTax kedaluwarsa.
 - Uji periode dengan data > 50 baris untuk memastikan pagination berjalan.
 
+## Struktur Kode
+
+- `content.js`: bootstrap, toolbar, dan alur dokumen yang dipilih dari tabel.
+- `content-multi-period.js`: pengambilan, pagination, pemetaan, serta ekspor data multi-periode.
+- `background.js`: request faktur dan helper API bersama.
+- `background-downloads.js`: antrean nama file, deteksi download, dan penghapusan PDF sementara.
+- `background-withholding.js`: request Bukti Potong dan BPPU.
+- `pdf-extractor.js`, `excel-exporter.js`, dan file `*-mapper.js`: ekstraksi serta transformasi data yang dapat diuji terpisah.
+
+Script tetap berupa JavaScript bawaan Chrome Extension; proyek ini tidak memerlukan bundler atau dependency npm.
+
+## Verifikasi Pengembangan
+
+Jalankan tes otomatis setelah setiap perubahan:
+
+```powershell
+node --test
+```
+
+Sebelum rilis, reload extension dan tab CoreTax, lalu uji minimal:
+
+1. **Buat Excel**, **Buat PDF**, dan **Buat PDF + Excel** dari baris tabel yang dipilih.
+2. Multi-periode Faktur Keluaran dan Faktur Masukan, termasuk opsi simpan PDF dan rincian barang.
+3. Multi-periode Bukti Potong/BPPU.
+4. Periode kosong, lebih dari 50 data, dan sesi login kedaluwarsa.
+5. Jumlah baris, nama file, kolom, serta beberapa nilai pajak dibandingkan dengan tampilan CoreTax.
+
 ## Disclaimer
 
 - Pengguna wajib mengecek kembali hasil ekstrak sebelum digunakan untuk pekerjaan/perpajakan.

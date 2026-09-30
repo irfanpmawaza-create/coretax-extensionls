@@ -10,11 +10,19 @@ const contentScripts = `${content}\n${multiPeriod}`;
 const background = fs.readFileSync(path.join(root, "background.js"), "utf8");
 const backgroundWithholding = fs.readFileSync(path.join(root, "background-withholding.js"), "utf8");
 const backgroundScripts = `${background}\n${backgroundWithholding}`;
+const popup = fs.readFileSync(path.join(root, "popup.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "toolbar.css"), "utf8");
 
 assert(manifest.content_scripts[0].css.includes("toolbar.css"));
 assert(manifest.content_scripts[0].js.includes("withholding-slip-mapper.js"));
 assert(manifest.content_scripts[0].js.includes("content-multi-period.js"));
+assert(manifest.content_scripts[0].js.indexOf("content-multi-period.js") < manifest.content_scripts[0].js.indexOf("content.js"));
+for (const file of manifest.content_scripts[0].js) {
+  assert(fs.existsSync(path.join(root, file)), `Content script tidak ditemukan: ${file}`);
+}
+assert.match(popup, /"withholding-slip-mapper\.js",\s*"content-multi-period\.js",\s*"content\.js"/);
+assert(fs.existsSync(path.join(root, "background-downloads.js")));
+assert(fs.existsSync(path.join(root, "background-withholding.js")));
 assert.match(content, /aria-expanded/);
 assert.match(content, /aria-live/);
 assert.match(content, /keepToolbarInViewport/);

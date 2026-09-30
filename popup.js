@@ -197,6 +197,7 @@ class PopupManager {
           "pdf-extractor.js",
           "excel-exporter.js",
           "invoice-detail-mapper.js",
+          "withholding-slip-mapper.js",
           "content-multi-period.js",
           "content.js"
         ]
