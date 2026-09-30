@@ -33,9 +33,13 @@ function loadContentApp() {
   sandbox.CoreTaxPdfExtractor = class {};
   sandbox.CoreTaxExcelExporter = class {};
 
+  const context = vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(root, "content-multi-period.js"), "utf8"), context, {
+    filename: "content-multi-period.js"
+  });
   const source = fs.readFileSync(path.join(root, "content.js"), "utf8")
     .replace("new CoreTaxPDFDownloaderV3();", "globalThis.coreTaxApp = new CoreTaxPDFDownloaderV3();");
-  vm.runInNewContext(source, sandbox, { filename: "content.js" });
+  vm.runInContext(source, context, { filename: "content.js" });
   return { app: sandbox.coreTaxApp, sandbox };
 }
 
