@@ -11,6 +11,7 @@ const background = fs.readFileSync(path.join(root, "background.js"), "utf8");
 const backgroundWithholding = fs.readFileSync(path.join(root, "background-withholding.js"), "utf8");
 const backgroundScripts = `${background}\n${backgroundWithholding}`;
 const popup = fs.readFileSync(path.join(root, "popup.js"), "utf8");
+const popupHtml = fs.readFileSync(path.join(root, "popup.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "toolbar.css"), "utf8");
 
 assert(manifest.content_scripts[0].css.includes("toolbar.css"));
@@ -21,16 +22,23 @@ for (const file of manifest.content_scripts[0].js) {
   assert(fs.existsSync(path.join(root, file)), `Content script tidak ditemukan: ${file}`);
 }
 assert.match(popup, /"withholding-slip-mapper\.js",\s*"content-multi-period\.js",\s*"content\.js"/);
+assert.match(popupHtml, /id="multi-invoice-type"[\s\S]*?value="output"[\s\S]*?value="input"/);
+assert.match(popup, /invoiceType,\s*year/);
+assert.match(popup, /multiInvoiceType\.disabled = isLoading/);
 assert(fs.existsSync(path.join(root, "background-downloads.js")));
 assert(fs.existsSync(path.join(root, "background-withholding.js")));
 assert.match(content, /aria-expanded/);
 assert.match(content, /aria-live/);
+assert.match(content, /Highlight Duplikat/);
+assert.match(content, /toggleDuplicateHighlights/);
 assert.match(content, /keepToolbarInViewport/);
 assert.match(content, /coretax-result-dialog/);
 assert.match(content, /showPopupMessage\(message, failedDocuments\.length > 0 \? "warning" : "success"\)/);
 assert.match(css, /width:\s*min\(220px, calc\(100vw - 24px\)\)/);
 assert.match(css, /\.coretax-toolbar__button\s*\{[\s\S]*?width:\s*100%/);
 assert.match(css, /animation:\s*coretax-result-blink/);
+assert.match(css, /\.coretax-duplicate-row/);
+assert.match(css, /\.coretax-duplicate-cell/);
 assert.match(contentScripts, /EInvoiceMenuType: invoiceType === "input" \? "Input" : "Outgoing"/);
 assert.match(contentScripts, /DocumentDate: item\.LastUpdatedDate \|\| ""/);
 assert.match(contentScripts, /AmendedDocumentFormAggregateIdentifier/);

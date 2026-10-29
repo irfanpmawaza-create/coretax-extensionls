@@ -255,19 +255,28 @@ class CoreTaxMultiPeriodDownloader {
   }
 
   async downloadMultiPeriodInvoices(options = {}) {
-    if (!this.isCompatiblePage()) {
-      throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
+    if (this.multiPeriodRunning) {
+      throw new Error("Proses multi periode sedang berjalan. Tunggu sampai selesai.");
     }
 
-    if (window.location.pathname.includes("/withholding-slips-portal/")) {
-      return this.downloadMultiPeriodWithholdingSlips(options);
-    }
+    this.multiPeriodRunning = true;
+    try {
+      if (!this.isCompatiblePage()) {
+        throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
+      }
 
-    if (!window.location.pathname.includes("/e-invoice-portal/")) {
-      throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
-    }
+      if (window.location.pathname.includes("/withholding-slips-portal/")) {
+        return await this.downloadMultiPeriodWithholdingSlips(options);
+      }
 
-    return this.downloadMultiPeriodInvoiceType(options, options.invoiceType === "input" ? "input" : "output");
+      if (!window.location.pathname.includes("/e-invoice-portal/")) {
+        throw new Error("Buka halaman e-Invoice atau withholding slips CoreTax terlebih dahulu.");
+      }
+
+      return await this.downloadMultiPeriodInvoiceType(options, options.invoiceType === "input" ? "input" : "output");
+    } finally {
+      this.multiPeriodRunning = false;
+    }
   }
 
   async downloadMultiPeriodInvoiceType(options, invoiceType) {
@@ -306,7 +315,9 @@ class CoreTaxMultiPeriodDownloader {
 
     let message = `Selesai memproses ${allInvoices.length} Faktur ${typeLabel} (${this.getMonthName(startMonth)}-${this.getMonthName(endMonth)} ${year}).`;
     const failedDocuments = [];
-    let outputFileName = "";
+    const summaryRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
+    this.excelExporter.export(summaryRows, fileName, "output");
+    message += `\nExcel ringkasan: ${fileName}.`;
 
     if (options.savePdf) {
       const pdfResult = await this.downloadInvoicePdfsForItems(allInvoices, invoiceType, {
@@ -331,22 +342,14 @@ class CoreTaxMultiPeriodDownloader {
           : `${filePrefix}_Rincian_${year}_${startLabel}-${endLabel}.xlsx`;
         const excelRows = detailResult.itemExcelRows.map(({ File, ...row }) => row);
         this.excelExporter.export(excelRows, itemFileName);
-        outputFileName = itemFileName;
         message += `\nExcel rincian per barang: ${itemFileName}.`;
       } else {
         message += `\nExcel rincian tidak dibuat karena tidak ada detail yang berhasil diambil.`;
       }
     }
 
-    if (!options.savePdf && !options.buildItemExcel) {
-      const excelRows = allInvoices.map((item) => this.mapOutputInvoiceToExcelRow(item));
-      this.excelExporter.export(excelRows, fileName, "output");
-      outputFileName = fileName;
-      message += `\nExcel ringkasan: ${fileName}.`;
-    }
-
     this.showFinalNotification(message, failedDocuments);
-    return { success: true, message, count: allInvoices.length, fileName: outputFileName };
+    return { success: true, message, count: allInvoices.length, fileName };
   }
 
   getWithholdingPeriodCode(month, year) {

@@ -5,6 +5,7 @@ class PopupManager {
       this.pdfOnlyBtn = document.getElementById("pdf-only-btn");
       this.downloadExcelBtn = document.getElementById("download-excel-btn");
       this.multiPeriodBtn = document.getElementById("multi-period-btn");
+      this.multiInvoiceType = document.getElementById("multi-invoice-type");
       this.multiYearInput = document.getElementById("multi-year");
       this.multiStartMonth = document.getElementById("multi-start-month");
       this.multiEndMonth = document.getElementById("multi-end-month");
@@ -16,7 +17,7 @@ class PopupManager {
   }
 
   initialize() {
-    if (!this.excelOnlyBtn || !this.pdfOnlyBtn || !this.downloadExcelBtn || !this.multiPeriodBtn) {
+    if (!this.excelOnlyBtn || !this.pdfOnlyBtn || !this.downloadExcelBtn || !this.multiPeriodBtn || !this.multiInvoiceType) {
       this.setStatus("Tombol proses tidak ditemukan.");
       return;
     }
@@ -75,6 +76,8 @@ class PopupManager {
       const year = Number(this.multiYearInput?.value);
       const startMonth = Number(this.multiStartMonth?.value);
       const endMonth = Number(this.multiEndMonth?.value);
+      const invoiceType = this.multiInvoiceType?.value === "input" ? "input" : "output";
+      const invoiceLabel = invoiceType === "input" ? "Masukan" : "Keluaran";
 
       if (!Number.isInteger(year) || year < 2020 || year > 2100) {
         throw new Error("Tahun tidak valid.");
@@ -86,17 +89,18 @@ class PopupManager {
         throw new Error("Bulan awal tidak boleh lebih besar dari bulan akhir.");
       }
 
-      this.setLoading(true, "Mengambil Faktur Keluaran multi periode...");
+      this.setLoading(true, `Mengambil Faktur ${invoiceLabel} multi periode...`);
 
       const activeTab = await this.getActiveTab();
       if (!activeTab?.id || !this.isCoreTaxHost(activeTab)) {
-        throw new Error("Buka halaman CoreTax Faktur Keluaran terlebih dahulu.");
+        throw new Error("Buka halaman CoreTax Faktur Keluaran atau Faktur Masukan terlebih dahulu.");
       }
 
       await this.ensureContentScriptInjected(activeTab.id);
 
       const response = await this.sendMessageToContent(activeTab.id, {
         action: "downloadMultiPeriodInvoices",
+        invoiceType,
         year,
         startMonth,
         endMonth,
@@ -362,6 +366,7 @@ class PopupManager {
       this.multiPeriodBtn.textContent = isLoading ? "Memproses Multi Periode..." : "Download Excel Multi Periode";
     }
 
+    if (this.multiInvoiceType) this.multiInvoiceType.disabled = isLoading;
     if (this.multiYearInput) this.multiYearInput.disabled = isLoading;
     if (this.multiStartMonth) this.multiStartMonth.disabled = isLoading;
     if (this.multiEndMonth) this.multiEndMonth.disabled = isLoading;

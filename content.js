@@ -60,11 +60,19 @@
       const excelBtn = makeButton("Buat Excel", "excelOnly", "excel");
       const pdfBtn = makeButton("Buat PDF", "pdfOnly", "pdf");
       const bothBtn = makeButton("Buat PDF + Excel", "downloadPdfAndExcel", "both");
+      const duplicateBtn = document.createElement("button");
+      duplicateBtn.type = "button";
+      duplicateBtn.className = "coretax-toolbar__button coretax-toolbar__button--duplicate";
+      duplicateBtn.textContent = "Highlight Duplikat";
+      duplicateBtn.title = "Tandai faktur dengan Referensi yang sama pada tabel saat ini";
+      duplicateBtn.setAttribute("aria-pressed", "false");
+      duplicateBtn.addEventListener("click", () => this.toggleDuplicateHighlights(duplicateBtn));
 
-      this.toolbarButtons = [excelBtn, pdfBtn, bothBtn];
+      this.toolbarButtons = [excelBtn, pdfBtn, bothBtn, duplicateBtn];
       body.appendChild(excelBtn);
       body.appendChild(pdfBtn);
       body.appendChild(bothBtn);
+      body.appendChild(duplicateBtn);
       body.appendChild(this.buildMultiPeriodSection());
 
       const status = document.createElement("p");
@@ -336,6 +344,94 @@
         button.disabled = false;
         button.textContent = originalLabel;
       }
+    }
+
+    toggleDuplicateHighlights(button) {
+      if (button.dataset.active === "true") {
+        this.clearDuplicateHighlights();
+        button.dataset.active = "false";
+        button.setAttribute("aria-pressed", "false");
+        button.textContent = "Highlight Duplikat";
+        this.setToolbarStatus("Highlight duplikat dihapus.", "success");
+        return;
+      }
+
+      const path = window.location.pathname.toLowerCase();
+      if (!path.includes("/output-tax") && !path.includes("/input-tax")) {
+        this.setToolbarStatus("Fitur duplikat hanya tersedia di halaman Faktur Keluaran atau Faktur Masukan.", "error");
+        return;
+      }
+
+      let targetTable = null;
+      let referenceIndex = -1;
+
+      for (const table of document.querySelectorAll("table")) {
+        if (!table.querySelector("tbody tr")) continue;
+
+        for (const headerRow of table.querySelectorAll("thead tr")) {
+          const cells = Array.from(headerRow.children);
+          const index = cells.findIndex((cell) => this.cleanText(cell.innerText).toLowerCase().includes("referensi"));
+          if (index >= 0) {
+            targetTable = table;
+            referenceIndex = index;
+            break;
+          }
+        }
+
+        if (targetTable) break;
+      }
+
+      if (!targetTable || referenceIndex < 0) {
+        this.setToolbarStatus("Kolom Referensi tidak ditemukan pada tabel.", "error");
+        return;
+      }
+
+      const counts = new Map();
+      const entries = [];
+      const normalizeReference = (value) => this.cleanText(value).toLocaleLowerCase("id-ID");
+
+      for (const row of targetTable.querySelectorAll("tbody tr")) {
+        const cell = row.children[referenceIndex];
+        if (!row.querySelector("td") || !cell) continue;
+
+        const reference = normalizeReference(cell.innerText);
+        if (!reference || reference === "-" || reference === "n/a") continue;
+
+        entries.push({ row, cell, reference });
+        counts.set(reference, (counts.get(reference) || 0) + 1);
+      }
+
+      this.clearDuplicateHighlights();
+      const duplicates = entries.filter(({ reference }) => counts.get(reference) > 1);
+
+      if (duplicates.length === 0) {
+        this.setToolbarStatus("Tidak ditemukan Referensi duplikat pada tabel saat ini.", "success");
+        return;
+      }
+
+      const duplicateReferences = new Set();
+      for (const { row, cell, reference } of duplicates) {
+        row.classList.add("coretax-duplicate-row");
+        cell.classList.add("coretax-duplicate-cell");
+        duplicateReferences.add(reference);
+      }
+
+      button.dataset.active = "true";
+      button.setAttribute("aria-pressed", "true");
+      button.textContent = "Reset Highlight Duplikat";
+      this.setToolbarStatus(
+        `Ditemukan ${duplicateReferences.size} Referensi duplikat pada ${duplicates.length} baris.`,
+        "error"
+      );
+    }
+
+    clearDuplicateHighlights() {
+      document.querySelectorAll("tr.coretax-duplicate-row").forEach((row) => {
+        row.classList.remove("coretax-duplicate-row");
+      });
+      document.querySelectorAll(".coretax-duplicate-cell").forEach((cell) => {
+        cell.classList.remove("coretax-duplicate-cell");
+      });
     }
 
     async handleToolbarClick(button, mode, originalLabel) {

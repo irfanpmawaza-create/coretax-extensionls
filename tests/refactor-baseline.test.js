@@ -66,7 +66,7 @@ async function assertPagination(invoiceType) {
   ]);
 }
 
-async function assertSummaryExport(invoiceType, expectedFileName) {
+async function assertSummaryExport(invoiceType, expectedFileName, options = {}) {
   const { app, sandbox } = loadContentApp();
   const exports = [];
   sandbox.location.hostname = "coretaxdjp.pajak.go.id";
@@ -78,12 +78,117 @@ async function assertSummaryExport(invoiceType, expectedFileName) {
     return [{ RecordId: `${type}-1`, TaxInvoicePeriod: "TD.00702", TaxInvoiceYear: year }];
   };
   app.excelExporter = { export: (...args) => exports.push(args) };
+  app.downloadInvoicePdfsForItems = async () => ({ pdfSuccessCount: 1, failedPdfs: [] });
+  app.fetchInvoiceDetailsForItems = async () => ({
+    detailSuccessCount: 1,
+    failedDocuments: [],
+    itemExcelRows: [{ File: "invoice.pdf", "Nomor Faktur Pajak": "001" }]
+  });
   app.showFinalNotification = () => {};
 
-  const result = await app.downloadMultiPeriodInvoices({ invoiceType, year: 2026, startMonth: 2, endMonth: 2 });
+  const result = await app.downloadMultiPeriodInvoices({ invoiceType, year: 2026, startMonth: 2, endMonth: 2, ...options });
   assert.equal(result.fileName, expectedFileName);
   assert.equal(exports[0][1], expectedFileName);
   assert.equal(exports[0][2], "output");
+  assert.match(result.message, /Excel ringkasan/);
+  assert.equal(exports.length, options.buildItemExcel ? 2 : 1);
+  if (options.buildItemExcel) {
+    assert.match(exports[1][1], /_Rincian_/);
+    assert.notEqual(exports[1][1], exports[0][1]);
+  }
+}
+
+async function assertMultiPeriodLock() {
+  const { app, sandbox } = loadContentApp();
+  sandbox.location.hostname = "coretaxdjp.pajak.go.id";
+  sandbox.location.pathname = "/e-invoice-portal/";
+
+  let releaseFirstRun;
+  app.downloadMultiPeriodInvoiceType = () => new Promise((resolve) => {
+    releaseFirstRun = resolve;
+  });
+
+  const firstRun = app.downloadMultiPeriodInvoices({ year: 2026, startMonth: 1, endMonth: 1 });
+  await assert.rejects(
+    app.downloadMultiPeriodInvoices({ year: 2026, startMonth: 1, endMonth: 1 }),
+    /sedang berjalan/
+  );
+  releaseFirstRun({ success: true });
+  await firstRun;
+
+  app.downloadMultiPeriodInvoiceType = async () => {
+    throw new Error("simulasi gagal");
+  };
+  await assert.rejects(
+    app.downloadMultiPeriodInvoices({ year: 2026, startMonth: 1, endMonth: 1 }),
+    /simulasi gagal/
+  );
+
+  app.downloadMultiPeriodInvoiceType = async () => ({ success: true });
+  const retry = await app.downloadMultiPeriodInvoices({ year: 2026, startMonth: 1, endMonth: 1 });
+  assert.equal(retry.success, true);
+}
+
+function assertDuplicateHighlight(pathname) {
+  const { app, sandbox } = loadContentApp();
+  sandbox.location.hostname = "coretaxdjp.pajak.go.id";
+  sandbox.location.pathname = pathname;
+
+  const makeClassList = () => {
+    const values = new Set();
+    return {
+      add: (...names) => names.forEach((name) => values.add(name)),
+      contains: (name) => values.has(name),
+      remove: (...names) => names.forEach((name) => values.delete(name)),
+      toggle: (name, force) => force ? values.add(name) : values.delete(name)
+    };
+  };
+  const makeCell = (innerText) => ({ innerText, classList: makeClassList() });
+  const makeRow = (reference) => {
+    const children = [makeCell(""), makeCell(reference), makeCell("APPROVED")];
+    return {
+      children,
+      classList: makeClassList(),
+      querySelector: (selector) => selector === "td" ? children[0] : null
+    };
+  };
+
+  const headerRow = { children: [makeCell("Pilih"), makeCell("Referensi"), makeCell("Status")] };
+  const rows = [makeRow("REF-001"), makeRow(" ref-001 "), makeRow("REF-002")];
+  const table = {
+    querySelector: (selector) => selector === "tbody tr" ? rows[0] : null,
+    querySelectorAll: (selector) => selector === "thead tr" ? [headerRow] : selector === "tbody tr" ? rows : []
+  };
+
+  sandbox.document.querySelectorAll = (selector) => {
+    if (selector === "table") return [table];
+    if (selector === "tr.coretax-duplicate-row") return rows.filter((row) => row.classList.contains("coretax-duplicate-row"));
+    if (selector === ".coretax-duplicate-cell") {
+      return rows.flatMap((row) => row.children).filter((cell) => cell.classList.contains("coretax-duplicate-cell"));
+    }
+    return [];
+  };
+
+  const attributes = {};
+  const button = {
+    dataset: {},
+    setAttribute: (name, value) => { attributes[name] = value; },
+    textContent: "Highlight Duplikat"
+  };
+
+  app.toggleDuplicateHighlights(button);
+  assert.equal(rows[0].classList.contains("coretax-duplicate-row"), true);
+  assert.equal(rows[1].classList.contains("coretax-duplicate-row"), true);
+  assert.equal(rows[2].classList.contains("coretax-duplicate-row"), false);
+  assert.equal(rows[0].children[1].classList.contains("coretax-duplicate-cell"), true);
+  assert.equal(button.textContent, "Reset Highlight Duplikat");
+  assert.equal(attributes["aria-pressed"], "true");
+
+  app.toggleDuplicateHighlights(button);
+  assert.equal(rows[0].classList.contains("coretax-duplicate-row"), false);
+  assert.equal(rows[1].children[1].classList.contains("coretax-duplicate-cell"), false);
+  assert.equal(button.textContent, "Highlight Duplikat");
+  assert.equal(attributes["aria-pressed"], "false");
 }
 
 function loadBackground() {
@@ -240,6 +345,12 @@ async function assertWithholdingPayload(background) {
   await assertPagination("input");
   await assertSummaryExport("output", "Faktur_Keluaran_2026_Feb.xlsx");
   await assertSummaryExport("input", "Faktur_Masukan_2026_Feb.xlsx");
+  await assertSummaryExport("output", "Faktur_Keluaran_2026_Feb.xlsx", { savePdf: true });
+  await assertSummaryExport("input", "Faktur_Masukan_2026_Feb.xlsx", { buildItemExcel: true });
+  await assertSummaryExport("output", "Faktur_Keluaran_2026_Feb.xlsx", { savePdf: true, buildItemExcel: true });
+  await assertMultiPeriodLock();
+  assertDuplicateHighlight("/e-invoice-portal/id-ID/output-tax");
+  assertDuplicateHighlight("/e-invoice-portal/id-ID/input-tax");
 
   const { app, sandbox } = loadContentApp();
   sandbox.location.hostname = "coretaxdjp.pajak.go.id";

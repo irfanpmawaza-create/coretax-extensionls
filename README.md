@@ -8,14 +8,15 @@
 - Mengekstrak data faktur ke file Excel.
 - Menyediakan mode **"Buat Excel Saja"** untuk menghapus PDF sementara setelah ekstraksi bila browser tetap membuat download.
 - Mengekstrak Dasar Pengenaan Pajak dan Jumlah PPN dari ringkasan faktur.
-- **Baru:** mengunduh Faktur Keluaran untuk rentang masa pajak (mis. Januari–Februari) ke satu file Excel tanpa mengganti filter bulan satu per satu.
+- Menandai baris Faktur Masukan/Keluaran yang memiliki nilai **Referensi** duplikat pada tabel saat ini.
+- Mengunduh Faktur Keluaran atau Faktur Masukan untuk rentang masa pajak (mis. Januari–Februari) ke satu file Excel tanpa mengganti filter bulan satu per satu.
 
 ## Cara Kerja Fitur Multi Periode
 
-1. Buka CoreTax > e-Invoice > Faktur Keluaran (output-tax).
-2. Pastikan tabel Faktur Keluaran sudah pernah memuat data pada sesi/tab tersebut. Jika perlu, ubah filter atau refresh tabel sekali.
+1. Buka CoreTax > e-Invoice > Faktur Keluaran atau Faktur Masukan.
+2. Pastikan tabel jenis faktur yang akan diproses sudah pernah memuat data pada sesi/tab tersebut. Jika perlu, ubah filter atau refresh tabel sekali.
 3. Klik extension.
-4. Isi **Tahun**, **Dari Bulan**, dan **Sampai Bulan**.
+4. Pilih **Jenis Faktur**, lalu isi **Tahun**, **Dari Bulan**, dan **Sampai Bulan**.
 5. Klik **"Download Excel Multi Periode"**.
 6. Extension memakai request API CoreTax pada sesi login aktif, mengambil data per bulan dengan pagination 50 baris, menggabungkannya, lalu membuat satu file XLSX.
 
@@ -23,7 +24,7 @@
 
 - Extension tidak memiliki token CoreTax yang di-hardcode.
 - Header `Authorization` dari request CoreTax hanya ditangkap sementara di memori service worker dan tidak ditulis ke file konfigurasi.
-- Jika service worker direstart dan konteks belum terbaca, cukup refresh/ubah filter tabel Faktur Keluaran sekali lalu coba kembali.
+- Jika service worker direstart dan konteks belum terbaca, cukup refresh/ubah filter tabel faktur yang akan diproses sekali lalu coba kembali.
 
 ## Halaman yang Didukung
 

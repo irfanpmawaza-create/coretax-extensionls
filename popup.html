@@ -33,12 +33,18 @@
 
   <details class="multi-period-section">
     <summary class="multi-period-title">
-      Faktur Keluaran Multi Periode
+      Faktur Multi Periode
       <span class="multi-period-chevron" aria-hidden="true">&#9660;</span>
     </summary>
 
     <div class="multi-period-body">
       <p class="multi-period-hint">Gabungkan beberapa masa pajak langsung ke satu file Excel.</p>
+
+      <label class="popup-field-label" for="multi-invoice-type">Jenis Faktur</label>
+      <select id="multi-invoice-type" class="popup-field">
+        <option value="output">Faktur Keluaran</option>
+        <option value="input">Faktur Masukan</option>
+      </select>
 
       <label class="popup-field-label" for="multi-year">Tahun</label>
       <input id="multi-year" class="popup-field" type="number" min="2020" max="2100" value="2026">
