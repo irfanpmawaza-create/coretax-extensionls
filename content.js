@@ -73,6 +73,7 @@
       body.appendChild(pdfBtn);
       body.appendChild(bothBtn);
       body.appendChild(duplicateBtn);
+      body.appendChild(this.buildTableSearch());
       body.appendChild(this.buildMultiPeriodSection());
 
       const status = document.createElement("p");
@@ -99,6 +100,7 @@
       toolbar.appendChild(header);
       toolbar.appendChild(body);
       document.body.appendChild(toolbar);
+      this.observeTableSearchChanges();
       this.keepToolbarInViewport(toolbar);
       window.addEventListener("resize", () => this.keepToolbarInViewport(toolbar));
     }
@@ -432,6 +434,107 @@
       document.querySelectorAll(".coretax-duplicate-cell").forEach((cell) => {
         cell.classList.remove("coretax-duplicate-cell");
       });
+    }
+
+    buildTableSearch() {
+      const section = document.createElement("div");
+      section.className = "coretax-toolbar__search";
+
+      const label = document.createElement("label");
+      label.className = "coretax-toolbar__label";
+      label.htmlFor = "coretax-table-search";
+      label.textContent = "Cari Tabel Saat Ini";
+
+      const controls = document.createElement("div");
+      controls.className = "coretax-toolbar__search-controls";
+
+      const input = document.createElement("input");
+      input.id = "coretax-table-search";
+      input.type = "search";
+      input.className = "coretax-toolbar__field coretax-toolbar__search-input";
+      input.placeholder = "Referensi, NPWP, nama...";
+
+      const resetButton = document.createElement("button");
+      resetButton.type = "button";
+      resetButton.className = "coretax-toolbar__search-reset";
+      resetButton.textContent = "×";
+      resetButton.title = "Reset pencarian";
+      resetButton.setAttribute("aria-label", "Reset pencarian tabel");
+      resetButton.hidden = true;
+
+      input.addEventListener("input", () => {
+        resetButton.hidden = !input.value;
+        this.filterTableRows(input.value);
+      });
+      resetButton.addEventListener("click", () => {
+        input.value = "";
+        resetButton.hidden = true;
+        this.filterTableRows("");
+        input.focus();
+      });
+
+      controls.appendChild(input);
+      controls.appendChild(resetButton);
+      section.appendChild(label);
+      section.appendChild(controls);
+      this.tableSearchInput = input;
+      return section;
+    }
+
+    getSearchableTableRows() {
+      let result = [];
+      for (const table of document.querySelectorAll("table")) {
+        const rows = Array.from(table.querySelectorAll("tbody tr")).filter((row) => (
+          row.querySelector("td") && !row.classList.contains("p-datatable-emptymessage")
+        ));
+        if (rows.length > result.length) result = rows;
+      }
+      return result;
+    }
+
+    filterTableRows(searchText, announce = true) {
+      const query = this.cleanText(searchText).toLocaleLowerCase("id-ID");
+      const rows = this.getSearchableTableRows();
+      let matchCount = 0;
+
+      for (const row of rows) {
+        const matches = !query || this.cleanText(row.innerText).toLocaleLowerCase("id-ID").includes(query);
+        row.classList.toggle("coretax-search-hidden", !matches);
+        if (matches) matchCount++;
+      }
+
+      if (announce) {
+        if (rows.length === 0) {
+          this.setToolbarStatus("Tabel data tidak ditemukan.", "error");
+        } else if (!query) {
+          this.setToolbarStatus("Pencarian tabel direset.", "success");
+        } else {
+          this.setToolbarStatus(
+            `Pencarian menampilkan ${matchCount} dari ${rows.length} baris pada halaman ini.`,
+            matchCount > 0 ? "success" : "error"
+          );
+        }
+      }
+
+      return { matchCount, totalCount: rows.length };
+    }
+
+    observeTableSearchChanges() {
+      if (typeof MutationObserver !== "function") return;
+      this.tableSearchObserver?.disconnect();
+      this.tableSearchObserver = new MutationObserver((mutations) => {
+        const query = this.tableSearchInput?.value;
+        if (!query || !mutations.some((mutation) => {
+          if (this.toolbar?.contains(mutation.target)) return false;
+          if (mutation.target.closest?.("table")) return true;
+          return Array.from(mutation.addedNodes).some((node) => (
+            node.nodeType === 1 && (node.matches?.("table, tbody, tr") || node.querySelector?.("table, tbody tr"))
+          ));
+        })) return;
+
+        this.filterTableRows(query, false);
+      });
+      this.tableSearchObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     async handleToolbarClick(button, mode, originalLabel) {

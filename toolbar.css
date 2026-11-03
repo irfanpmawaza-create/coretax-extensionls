@@ -38,6 +38,7 @@
 .coretax-toolbar__header:focus-visible,
 .coretax-toolbar__button:focus-visible,
 .coretax-toolbar__field:focus-visible,
+.coretax-toolbar__search-reset:focus-visible,
 .coretax-toolbar__check input:focus-visible {
   outline: 3px solid #ffc91b;
   outline-offset: -3px;
@@ -140,6 +141,45 @@ tr.coretax-duplicate-row > td:last-child {
 td.coretax-duplicate-cell {
   color: #991b1b !important;
   font-weight: 800 !important;
+}
+
+tr.coretax-search-hidden {
+  display: none !important;
+}
+
+.coretax-toolbar__search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #ddd;
+}
+
+.coretax-toolbar__search-controls {
+  display: flex;
+}
+
+.coretax-toolbar__search-input {
+  min-width: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.coretax-toolbar__search-reset {
+  min-width: 34px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+  background: #fff;
+  color: #555;
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.coretax-toolbar__search-reset:hover {
+  background: #eee;
+  color: #111;
 }
 
 .coretax-toolbar__button--custom[aria-expanded="true"] .coretax-toolbar__chevron {

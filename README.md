@@ -9,6 +9,7 @@
 - Menyediakan mode **"Buat Excel Saja"** untuk menghapus PDF sementara setelah ekstraksi bila browser tetap membuat download.
 - Mengekstrak Dasar Pengenaan Pajak dan Jumlah PPN dari ringkasan faktur.
 - Menandai baris Faktur Masukan/Keluaran yang memiliki nilai **Referensi** duplikat pada tabel saat ini.
+- Mencari Referensi, NPWP, nama, atau teks lain pada halaman tabel yang sedang tampil.
 - Mengunduh Faktur Keluaran atau Faktur Masukan untuk rentang masa pajak (mis. Januari–Februari) ke satu file Excel tanpa mengganti filter bulan satu per satu.
 
 ## Cara Kerja Fitur Multi Periode

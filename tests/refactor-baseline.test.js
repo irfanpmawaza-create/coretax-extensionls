@@ -191,6 +191,60 @@ function assertDuplicateHighlight(pathname) {
   assert.equal(attributes["aria-pressed"], "false");
 }
 
+function assertTableSearch() {
+  const { app, sandbox } = loadContentApp();
+  const makeClassList = () => {
+    const values = new Set();
+    return {
+      add: (...names) => names.forEach((name) => values.add(name)),
+      contains: (name) => values.has(name),
+      remove: (...names) => names.forEach((name) => values.delete(name)),
+      toggle: (name, force) => force ? values.add(name) : values.delete(name)
+    };
+  };
+  const makeRow = (innerText) => ({
+    innerText,
+    classList: makeClassList(),
+    querySelector: (selector) => selector === "td" ? {} : null
+  });
+  const rows = [
+    makeRow("REF-001 PT Alpha APPROVED"),
+    makeRow("REF-002   PT Beta Sejahtera   DRAFT"),
+    makeRow("REF-003 PT Gamma APPROVED")
+  ];
+  const smallTable = { querySelectorAll: () => [makeRow("Bukan tabel utama")] };
+  const mainTable = { querySelectorAll: (selector) => selector === "tbody tr" ? rows : [] };
+  sandbox.document.querySelectorAll = (selector) => selector === "table" ? [smallTable, mainTable] : [];
+  app.setToolbarStatus = () => {};
+
+  rows[0].classList.add("coretax-duplicate-row");
+  const result = app.filterTableRows(" beta   sejahtera ");
+  assert.equal(result.matchCount, 1);
+  assert.equal(result.totalCount, 3);
+  assert.equal(rows[0].classList.contains("coretax-search-hidden"), true);
+  assert.equal(rows[1].classList.contains("coretax-search-hidden"), false);
+  assert.equal(rows[2].classList.contains("coretax-search-hidden"), true);
+
+  app.filterTableRows("");
+  assert.equal(rows.every((row) => !row.classList.contains("coretax-search-hidden")), true);
+  assert.equal(rows[0].classList.contains("coretax-duplicate-row"), true);
+
+  let observerCallback;
+  sandbox.document.body = {};
+  sandbox.MutationObserver = class {
+    constructor(callback) { observerCallback = callback; }
+    disconnect() {}
+    observe() {}
+  };
+  app.toolbar = { contains: () => false };
+  app.tableSearchInput = { value: "alpha" };
+  const reapplied = [];
+  app.filterTableRows = (...args) => reapplied.push(args);
+  app.observeTableSearchChanges();
+  observerCallback([{ target: { closest: () => ({}) }, addedNodes: [] }]);
+  assert.deepEqual(reapplied, [["alpha", false]]);
+}
+
 function loadBackground() {
   const runtimeListeners = [];
   const beforeRequests = [];
@@ -351,6 +405,7 @@ async function assertWithholdingPayload(background) {
   await assertMultiPeriodLock();
   assertDuplicateHighlight("/e-invoice-portal/id-ID/output-tax");
   assertDuplicateHighlight("/e-invoice-portal/id-ID/input-tax");
+  assertTableSearch();
 
   const { app, sandbox } = loadContentApp();
   sandbox.location.hostname = "coretaxdjp.pajak.go.id";
